@@ -38,7 +38,7 @@ const activityTypes: ActivityType[] = ['Actividad', 'Comida', 'Compras', 'Transp
 
 const activityTypeVisuals: Record<ActivityType, { border: string; text: string; icon: React.ElementType }> = {
   Actividad: { border: "border-purple-500", text: "text-purple-700 dark:text-purple-300", icon: Puzzle },
-  Comida: { border: "border-orange-500", text: "text-orange-700 dark:text-orange-300", icon: Utensils },
+  Comida: { border: "border-orange-600", text: "text-orange-700 dark:text-orange-400", icon: Utensils },
   Compras: { border: "border-pink-500", text: "text-pink-700 dark:text-pink-300", icon: ShoppingCart },
   Transporte: { border: "border-teal-500", text: "text-teal-700 dark:text-teal-300", icon: Car },
   Alojamiento: { border: "border-blue-500", text: "text-blue-700 dark:text-blue-300", icon: BedDouble },

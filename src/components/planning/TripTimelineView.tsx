@@ -33,7 +33,7 @@ const activityTypesForForm: ActivityType[] = ['Actividad', 'Comida', 'Compras', 
 
 const activityTypeVisuals: Record<ActivityType, { bg: string; border: string; text: string; icon: React.ElementType }> = {
   Actividad: { bg: "bg-purple-100 dark:bg-purple-900/40", border: "border-purple-500", text: "text-purple-700 dark:text-purple-300", icon: PuzzleIcon },
-  Comida: { bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-500", text: "text-orange-700 dark:text-orange-300", icon: Utensils },
+  Comida: { bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-600", text: "text-orange-800 dark:text-orange-300", icon: Utensils },
   Compras: { bg: "bg-pink-100 dark:bg-pink-900/40", border: "border-pink-500", text: "text-pink-700 dark:text-pink-300", icon: ShoppingCart },
   Transporte: { bg: "bg-teal-100 dark:bg-teal-900/40", border: "border-teal-500", text: "text-teal-700 dark:text-teal-300", icon: Car },
   Alojamiento: { bg: "bg-blue-100 dark:bg-blue-900/40", border: "border-blue-500", text: "text-blue-700 dark:text-blue-300", icon: BedDouble },

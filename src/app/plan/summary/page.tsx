@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { Briefcase, CalendarDays, CheckSquare, MapPin, Plane, FileText, Edit3, PlusCircle, Landmark, Building2, Brain, Wand2, ArrowRight, Upload, RefreshCcw, Loader2, PiggyBank, Info, Clock, Users, ScrollText, FileDown, ClipboardList } from "lucide-react";
+import { Briefcase, CalendarDays, CheckSquare, MapPin, Plane, FileText, Edit3, PlusCircle, Landmark, Building2, Brain, Wand2, ArrowRight, Upload, RefreshCcw, Loader2, PiggyBank, Info, Clock, Users, ScrollText, FileDown, ClipboardList, ClipboardCheck } from "lucide-react";
 import { format, parseISO, isWithinInterval } from "date-fns";
 import { es } from 'date-fns/locale';
 import Link from "next/link";
@@ -34,8 +34,10 @@ import type { ActivityItem, ActivityType, FullTripData, PackingListItem, Prepara
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
+import { PieChart, Pie, Cell, RadialBarChart, RadialBar, PolarGrid } from "recharts";
+import type jsPDF from 'jspdf';
+import type html2canvas from 'html2canvas';
 
 
 // Componente para la plantilla imprimible del PDF
@@ -43,7 +45,7 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
     tripData: FullTripData; 
     budgetSummary: { totalBudget: number; budgetByCategory: Record<string, number>; };
     packingSummary: { packedItems: PackingListItem[]; unpackedItems: PackingListItem[]; totalItems: number; packedPercentage: number; };
-    preparationsSummary: { allItems: PreparationItem[]; completedItems: PreparationItem[]; pendingItems: PreparationItem[]; };
+    preparationsSummary: { allItems: PreparationItem[]; completedItems: PreparationItem[]; pendingItems: PreparationItem[]; totalItems: number, completedPercentage: number };
     getActivitiesForDate: (date: string) => ActivityItem[];
 }>(({ tripData, budgetSummary, packingSummary, preparationsSummary, getActivitiesForDate }, ref) => {
     
@@ -56,12 +58,13 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
     
     const sortedItinerary = [...(tripData.itinerary || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const activityTypePrintableStyles: Record<ActivityType, { border: string; bg: string; text: string; }> = {
-        Actividad: { border: "border-purple-500", bg: "bg-purple-50", text: "text-purple-800" },
-        Comida: { border: "border-orange-500", bg: "bg-orange-50", text: "text-orange-800" },
-        Compras: { border: "border-pink-500", bg: "bg-pink-50", text: "text-pink-800" },
-        Transporte: { border: "border-teal-500", bg: "bg-teal-50", text: "text-teal-800" },
-        Alojamiento: { border: "border-blue-500", bg: "bg-blue-50", text: "text-blue-800" },
+    const activityTypePrintableStyles: Record<string, { border: string; bg: string; text: string; }> = {
+        Actividad: { border: 'border-[#a855f7]', bg: 'bg-[#a855f7]/10', text: 'text-[#5b21b6]' },
+        Comida: { border: 'border-[#f97316]', bg: 'bg-[#f97316]/10', text: 'text-[#b45309]' },
+        Compras: { border: 'border-[#ec4899]', bg: 'bg-[#ec4899]/10', text: 'text-[#be185d]' },
+        Transporte: { border: 'border-[#14b8a6]', bg: 'bg-[#14b8a6]/10', text: 'text-[#0d9488]' },
+        Alojamiento: { border: 'border-[#3b82f6]', bg: 'bg-[#3b82f6]/10', text: 'text-[#1d4ed8]' },
+        default: { border: 'border-gray-500', bg: 'bg-gray-50', text: 'text-gray-800' }
     };
 
     return (
@@ -174,7 +177,7 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
                             </h3>
                             <div className="pl-4 mt-3 space-y-3">
                                 {sortedDayActivities.length > 0 ? sortedDayActivities.map(activity => {
-                                    const styles = activityTypePrintableStyles[activity.type] || { border: 'border-gray-500', bg: 'bg-gray-50', text: 'text-gray-800' };
+                                    const styles = activityTypePrintableStyles[activity.type] || activityTypePrintableStyles.default;
                                     return (
                                         <div key={activity.id} className={`p-3 rounded-md border-l-4 printable-activity ${styles.border} ${styles.bg}`}>
                                             <p className={`font-bold ${styles.text}`}>{activity.name} <span className="text-sm font-normal text-gray-600">({activity.type}{activity.mealType ? ` - ${activity.mealType}`: ''})</span></p>
@@ -294,53 +297,83 @@ export default function SummaryPage() {
   
   const packingSummary = useMemo(() => {
     if (!activeTripData?.packingList) {
-      return {
-        packedItems: [],
-        unpackedItems: [],
-        totalItems: 0,
-        packedPercentage: 0,
-      };
+      return { packedItems: [], unpackedItems: [], totalItems: 0, packedPercentage: 0 };
     }
     const currentPackingList = activeTripData.packingList;
     const packedItems = currentPackingList.filter(item => item.packed);
     const unpackedItems = currentPackingList.filter(item => !item.packed);
     const totalItems = currentPackingList.length;
-    const packedPercentage = totalItems > 0 ? (packedItems.length / totalItems) * 100 : 0;
+    const packedPercentage = totalItems > 0 ? Math.round((packedItems.length / totalItems) * 100) : 0;
     
-    const priorityOrder: Record<PackingListItem['priority'], number> = {
-      'Alta': 1,
-      'Media': 2,
-      'Baja': 3,
-    };
+    const priorityOrder: Record<PackingListItem['priority'], number> = { 'Alta': 1, 'Media': 2, 'Baja': 3 };
 
     const sortedUnpackedItems = unpackedItems.sort((a, b) => {
         const priorityComparison = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (priorityComparison !== 0) {
-            return priorityComparison;
-        }
-        return a.name.localeCompare(b.name); // Secondary sort by name
+        if (priorityComparison !== 0) return priorityComparison;
+        return a.name.localeCompare(b.name);
     });
     
     const sortedPackedItems = packedItems.sort((a,b) => a.name.localeCompare(b.name));
     
-    return {
-      packedItems: sortedPackedItems,
-      unpackedItems: sortedUnpackedItems,
-      totalItems,
-      packedPercentage,
-    };
+    return { packedItems: sortedPackedItems, unpackedItems, totalItems, packedPercentage };
   }, [activeTripData?.packingList]);
 
   const preparationsSummary = useMemo(() => {
     if (!activeTripData?.preparations) {
-      return { allItems: [], completedItems: [], pendingItems: [] };
+      return { allItems: [], completedItems: [], pendingItems: [], totalItems: 0, completedPercentage: 0 };
     }
     const allItems = [...activeTripData.preparations].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
     const completedItems = allItems.filter(item => item.completed);
     const pendingItems = allItems.filter(item => !item.completed);
+    const totalItems = allItems.length;
+    const completedPercentage = totalItems > 0 ? Math.round((completedItems.length / totalItems) * 100) : 0;
 
-    return { allItems, completedItems, pendingItems };
+    return { allItems, completedItems, pendingItems, totalItems, completedPercentage };
   }, [activeTripData?.preparations]);
+
+  const budgetChartData = useMemo(() => {
+    if (!budgetSummary || Object.keys(budgetSummary.budgetByCategory).length === 0) {
+      return [];
+    }
+
+    const categoryBaseColors: Record<string, string> = {
+      'Actividad': '#a855f7',
+      'Comida': '#f97316',
+      'Compras': '#ec4899',
+      'Transporte': '#14b8a6',
+      'Alojamiento': '#3b82f6',
+      'default': '#6b7280' // gray-500
+    };
+
+    return Object.entries(budgetSummary.budgetByCategory).map(([category, budget]) => {
+      let color = categoryBaseColors.default;
+
+      if (category.includes('Transporte') || category === 'Gasolina' || category === 'Peajes') {
+        color = categoryBaseColors['Transporte'];
+      } else if (categoryBaseColors[category]) {
+        color = categoryBaseColors[category];
+      }
+      
+      return {
+        category,
+        budget,
+        fill: color
+      };
+    });
+  }, [budgetSummary]);
+
+  const budgetChartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    if (budgetChartData.length > 0) {
+      budgetChartData.forEach(item => {
+        config[item.category] = {
+          label: item.category,
+          color: item.fill,
+        };
+      });
+    }
+    return config as ChartConfig;
+  }, [budgetChartData]);
 
 
   if (isLoading && !activeTripData) {
@@ -593,8 +626,10 @@ export default function SummaryPage() {
         return;
     }
     setIsDownloadingPdf(true);
-
     try {
+        const { default: jsPDF } = await import('jspdf');
+        const { default: html2canvas } = await import('html2canvas');
+
         const canvas = await html2canvas(printableRef.current, {
             scale: 2,
             useCORS: true,
@@ -668,7 +703,7 @@ export default function SummaryPage() {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-6">
                 <h1 className="text-4xl md:text-5xl font-bold font-headline text-white shadow-lg">{activeTripData.destination}</h1>
-                 <p className="text-lg text-gray-200 shadow-md">Resumen de tu Aventura</p>
+                 <p className="text-lg text-gray-200 shadow-md">Dashboard de tu Aventura</p>
             </div>
         </div>
         <CardContent className="p-6">
@@ -724,6 +759,97 @@ export default function SummaryPage() {
                 Descargar PDF
             </Button>
           </div>
+
+          {/* DASHBOARD VISUALIZATION */}
+          <Separator className="my-8" />
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <Card className="lg:col-span-2">
+                <CardHeader>
+                    <CardTitle className="flex items-center text-xl">
+                      <PiggyBank className="mr-2 h-5 w-5 text-primary" />
+                      Desglose de Presupuesto
+                    </CardTitle>
+                    <CardDescription>
+                      Total Estimado: ${budgetSummary.totalBudget.toLocaleString()}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="pl-2">
+                    {budgetChartData.length > 0 ? (
+                        <ChartContainer config={budgetChartConfig} className="mx-auto aspect-square h-[300px]">
+                            <PieChart>
+                                <ChartTooltip content={<ChartTooltipContent nameKey="budget" hideLabel />} />
+                                <Pie data={budgetChartData} dataKey="budget" nameKey="category" innerRadius={60} strokeWidth={5}>
+                                {budgetChartData.map((entry) => (
+                                    <Cell key={`cell-${entry.category}`} fill={entry.fill} />
+                                ))}
+                                </Pie>
+                                <ChartLegend content={<ChartLegendContent nameKey="category" />} />
+                            </PieChart>
+                        </ChartContainer>
+                    ) : (
+                      <p className="text-muted-foreground text-center py-10">No hay presupuesto asignado para mostrar el gráfico.</p>
+                    )}
+                </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center text-xl">
+                            <ClipboardCheck className="mr-2 h-5 w-5 text-primary" />
+                            Preparativos
+                        </CardTitle>
+                        <CardDescription>
+                            {preparationsSummary.completedItems.length} de {preparationsSummary.totalItems} tareas completadas.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-center items-center">
+                      {preparationsSummary.totalItems > 0 ? (
+                        <ChartContainer config={{ progress: { label: "Progreso", color: "hsl(var(--primary))" } }} className="mx-auto aspect-square h-[150px]">
+                            <RadialBarChart data={[{ name: 'progress', value: preparationsSummary.completedPercentage, fill: 'hsl(var(--primary))' }]} startAngle={90} endAngle={-270} innerRadius="70%" outerRadius="100%">
+                                <PolarGrid gridType="circle" radialLines={false} stroke="none" />
+                                <RadialBar dataKey="value" background cornerRadius={10} />
+                                <ChartTooltip content={<ChartTooltipContent cursor={false} contentStyle={{ display: 'none' }} />} />
+                                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-4xl font-bold">
+                                    {preparationsSummary.completedPercentage}%
+                                </text>
+                            </RadialBarChart>
+                        </ChartContainer>
+                      ) : (
+                        <p className="text-muted-foreground text-sm py-4">Sin tareas</p>
+                      )}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center text-xl">
+                            <Briefcase className="mr-2 h-5 w-5 text-primary" />
+                            Empaque
+                        </CardTitle>
+                        <CardDescription>
+                           {packingSummary.packedItems.length} de {packingSummary.totalItems} artículos empacados.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex justify-center items-center">
+                        {packingSummary.totalItems > 0 ? (
+                            <ChartContainer config={{ progress: { label: "Progreso", color: "hsl(var(--accent))" } }} className="mx-auto aspect-square h-[150px]">
+                                <RadialBarChart data={[{ name: 'progress', value: packingSummary.packedPercentage, fill: 'hsl(var(--accent))' }]} startAngle={90} endAngle={-270} innerRadius="70%" outerRadius="100%">
+                                    <PolarGrid gridType="circle" radialLines={false} stroke="none" />
+                                    <RadialBar dataKey="value" background cornerRadius={10} />
+                                    <ChartTooltip content={<ChartTooltipContent cursor={false} contentStyle={{ display: 'none' }} />} />
+                                    <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-4xl font-bold">
+                                        {packingSummary.packedPercentage}%
+                                    </text>
+                                </RadialBarChart>
+                            </ChartContainer>
+                        ) : (
+                          <p className="text-muted-foreground text-sm py-4">Lista vacía</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+          </section>
+
 
           <AlertDialog open={isOptimizationDetailsOpen} onOpenChange={setIsOptimizationDetailsOpen}>
             <AlertDialogContent className="max-w-2xl">
@@ -800,7 +926,7 @@ export default function SummaryPage() {
           <Separator className="my-6" />
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-primary" />Preparativos</h2>
+            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-primary" />Resumen de Preparativos</h2>
             {preparationsSummary.allItems.length > 0 ? (
                 <div className="space-y-2">
                     {preparationsSummary.pendingItems.length > 0 && (
@@ -854,7 +980,7 @@ export default function SummaryPage() {
           <Separator className="my-6" />
 
           <section className="mb-8">
-            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><Briefcase className="mr-2 h-6 w-6 text-primary" />Lista de Empaque</h2>
+            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><Briefcase className="mr-2 h-6 w-6 text-primary" />Resumen de Empaque</h2>
             {packingSummary.totalItems > 0 ? (
               <div className="space-y-4">
                 <div>
@@ -921,42 +1047,6 @@ export default function SummaryPage() {
                 Ver/Editar Lista de Empaque <ArrowRight className="ml-1 h-3 w-3"/>
               </Button>
             </Link>
-          </section>
-
-          <Separator className="my-6" />
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center">
-              <PiggyBank className="mr-2 h-6 w-6 text-primary" />
-              Resumen de Presupuesto
-            </h2>
-            {budgetSummary.totalBudget > 0 ? (
-              <div className="space-y-4">
-                <Card className="bg-primary/5 border-primary/20 shadow-md">
-                  <CardHeader className="p-4 flex flex-row items-center justify-between">
-                    <CardTitle className="text-lg font-headline">
-                      Presupuesto Total Estimado
-                    </CardTitle>
-                    <span className="text-2xl font-bold text-primary">${budgetSummary.totalBudget.toLocaleString()}</span>
-                  </CardHeader>
-                </Card>
-                <div>
-                  <h3 className="text-md font-semibold mb-2 mt-4 text-muted-foreground">Desglose por Categoría:</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {Object.entries(budgetSummary.budgetByCategory)
-                      .sort(([catA], [catB]) => catA.localeCompare(catB))
-                      .map(([category, amount]) => (
-                      <div key={category} className="flex justify-between items-center text-sm p-3 rounded-lg bg-background border">
-                        <span className="font-medium text-muted-foreground">{category}</span>
-                        <span className="font-semibold text-foreground">${(amount as number).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No se ha asignado presupuesto a ninguna actividad.</p>
-            )}
           </section>
 
           <Separator className="my-6" />
@@ -1041,7 +1131,7 @@ export default function SummaryPage() {
       </Card>
       
       {/* Hidden component for PDF generation */}
-      <div className="fixed -left-[9999px] top-auto h-auto w-auto opacity-0" aria-hidden={isDownloadingPdf ? "false" : "true"}>
+      <div className="fixed -left-[9999px] top-auto h-auto w-auto opacity-0 pointer-events-none" aria-hidden="true">
         <PrintableSummary 
             ref={printableRef}
             tripData={activeTripData}
