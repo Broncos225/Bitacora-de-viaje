@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import type { User } from 'firebase/auth';
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
-import type { FullTripData, PackingListItem, DailyPlan, ActivityItem, TripBase, UserTrips, ActivityType } from '@/lib/types';
+import type { FullTripData, PackingListItem, DailyPlan, ActivityItem, TripBase, UserTrips, ActivityType, PreparationItem } from '@/lib/types';
 import {
   saveTripForUser as saveTripForUserFirebase,
   loadTripsForUser as loadTripsForUserFirebase,
@@ -32,6 +33,10 @@ interface TripDataContextType {
   addPackingItem: (item: Omit<PackingListItem, 'id'>) => void;
   updatePackingItem: (updatedItem: PackingListItem) => void;
   removePackingItem: (itemId: string) => void;
+  // Preparation List
+  addPreparationItem: (item: Omit<PreparationItem, 'id'>) => void;
+  updatePreparationItem: (updatedItem: PreparationItem) => void;
+  removePreparationItem: (itemId: string) => void;
   // Daily Plan (Notas y optimización)
   getDailyPlan: (date: string) => DailyPlan | undefined;
   updateDailyPlan: (date: string, updatedPlanData: Partial<Omit<DailyPlan, 'date' >>) => void;
@@ -68,6 +73,7 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
           ...dp,
           dayImageUri: dp.dayImageUri === "" ? undefined : dp.dayImageUri,
         })),
+        preparations: trip.preparations || [],
       };
     }
     return null;
@@ -96,6 +102,7 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
                   dayImageUri: dp.dayImageUri === "" ? undefined : dp.dayImageUri,
                 })),
                 packingList: trip.packingList || [],
+                preparations: trip.preparations || [],
                 summaryImageUri: trip.summaryImageUri === "" ? undefined : trip.summaryImageUri,
               };
               delete (cleanedTrip as any).accommodationStays;
@@ -141,6 +148,7 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
       ...updatedTripDataForSave,
       summaryImageUri: updatedTripDataForSave.summaryImageUri || "",
       packingList: updatedTripDataForSave.packingList || [],
+      preparations: updatedTripDataForSave.preparations || [],
       itinerary: (updatedTripDataForSave.itinerary || []).map(plan => ({
         date: plan.date,
         notes: plan.notes || '',
@@ -232,6 +240,7 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
     }
 
     newFullTripDetails.packingList = activeTripData.packingList || [];
+    newFullTripDetails.preparations = activeTripData.preparations || [];
     newFullTripDetails.activities = activeTripData.activities || [];
     newFullTripDetails.summaryImageUri = activeTripData.summaryImageUri;
 
@@ -272,15 +281,18 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
 
   const addPackingItem = useCallback((item: Omit<PackingListItem, 'id'>) => {
     if (!activeTripData) return;
-    const newItem = { ...item, id: `pack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, packed: false };
+    const capitalizedName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
+    const newItem = { ...item, name: capitalizedName, id: `pack-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, packed: false };
     const updatedPackingList = [...(activeTripData.packingList || []), newItem];
     _performOptimisticUpdateAndSave({ ...activeTripData, packingList: updatedPackingList });
   }, [activeTripData, _performOptimisticUpdateAndSave]);
 
   const updatePackingItem = useCallback((updatedItem: PackingListItem) => {
     if (!activeTripData) return;
+    const capitalizedName = updatedItem.name.charAt(0).toUpperCase() + updatedItem.name.slice(1);
+    const finalUpdatedItem = { ...updatedItem, name: capitalizedName };
     const updatedPackingList = (activeTripData.packingList || []).map(item =>
-      item.id === updatedItem.id ? updatedItem : item
+      item.id === finalUpdatedItem.id ? finalUpdatedItem : item
     );
     _performOptimisticUpdateAndSave({ ...activeTripData, packingList: updatedPackingList });
   }, [activeTripData, _performOptimisticUpdateAndSave]);
@@ -289,6 +301,28 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
     if (!activeTripData) return;
     const updatedPackingList = (activeTripData.packingList || []).filter(item => item.id !== itemId);
     _performOptimisticUpdateAndSave({ ...activeTripData, packingList: updatedPackingList });
+  }, [activeTripData, _performOptimisticUpdateAndSave]);
+
+  const addPreparationItem = useCallback((item: Omit<PreparationItem, 'id'>) => {
+    if (!activeTripData) return;
+    const capitalizedName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
+    const newItem = { ...item, name: capitalizedName, id: `prep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, completed: false };
+    const updatedPreparations = [...(activeTripData.preparations || []), newItem];
+    _performOptimisticUpdateAndSave({ ...activeTripData, preparations: updatedPreparations });
+  }, [activeTripData, _performOptimisticUpdateAndSave]);
+
+  const updatePreparationItem = useCallback((updatedItem: PreparationItem) => {
+    if (!activeTripData) return;
+    const updatedPreparations = (activeTripData.preparations || []).map(item =>
+      item.id === updatedItem.id ? updatedItem : item
+    );
+    _performOptimisticUpdateAndSave({ ...activeTripData, preparations: updatedPreparations });
+  }, [activeTripData, _performOptimisticUpdateAndSave]);
+
+  const removePreparationItem = useCallback((itemId: string) => {
+    if (!activeTripData) return;
+    const updatedPreparations = (activeTripData.preparations || []).filter(item => item.id !== itemId);
+    _performOptimisticUpdateAndSave({ ...activeTripData, preparations: updatedPreparations });
   }, [activeTripData, _performOptimisticUpdateAndSave]);
 
   const getDailyPlan = useCallback((date: string): DailyPlan | undefined => {
@@ -364,6 +398,9 @@ export function TripDataProvider({ children }: { children: ReactNode }) {
     addPackingItem,
     updatePackingItem,
     removePackingItem,
+    addPreparationItem,
+    updatePreparationItem,
+    removePreparationItem,
     getDailyPlan,
     updateDailyPlan,
     updateDailyPlanImage,

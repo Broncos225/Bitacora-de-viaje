@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
-import { Briefcase, CalendarDays, CheckSquare, MapPin, Plane, FileText, Edit3, PlusCircle, Landmark, Building2, Brain, Wand2, ArrowRight, Upload, RefreshCcw, Loader2, PiggyBank, Info, Clock, Users, ScrollText, FileDown } from "lucide-react";
+import { Briefcase, CalendarDays, CheckSquare, MapPin, Plane, FileText, Edit3, PlusCircle, Landmark, Building2, Brain, Wand2, ArrowRight, Upload, RefreshCcw, Loader2, PiggyBank, Info, Clock, Users, ScrollText, FileDown, ClipboardList } from "lucide-react";
 import { format, parseISO, isWithinInterval } from "date-fns";
 import { es } from 'date-fns/locale';
 import Link from "next/link";
@@ -30,10 +30,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import type { ActivityItem, ActivityType, FullTripData, PackingListItem } from "@/lib/types";
+import type { ActivityItem, ActivityType, FullTripData, PackingListItem, PreparationItem } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 // Componente para la plantilla imprimible del PDF
@@ -41,8 +43,9 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
     tripData: FullTripData; 
     budgetSummary: { totalBudget: number; budgetByCategory: Record<string, number>; };
     packingSummary: { packedItems: PackingListItem[]; unpackedItems: PackingListItem[]; totalItems: number; packedPercentage: number; };
+    preparationsSummary: { allItems: PreparationItem[]; completedItems: PreparationItem[]; pendingItems: PreparationItem[]; };
     getActivitiesForDate: (date: string) => ActivityItem[];
-}>(({ tripData, budgetSummary, packingSummary, getActivitiesForDate }, ref) => {
+}>(({ tripData, budgetSummary, packingSummary, preparationsSummary, getActivitiesForDate }, ref) => {
     
     const travelers = tripData.travelers;
     const totalTravelers = travelers ? (travelers.men || 0) + (travelers.women || 0) + (travelers.children || 0) + (travelers.seniors || 0) : 0;
@@ -53,6 +56,14 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
     
     const sortedItinerary = [...(tripData.itinerary || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    const activityTypePrintableStyles: Record<ActivityType, { border: string; bg: string; text: string; }> = {
+        Actividad: { border: "border-purple-500", bg: "bg-purple-50", text: "text-purple-800" },
+        Comida: { border: "border-orange-500", bg: "bg-orange-50", text: "text-orange-800" },
+        Compras: { border: "border-pink-500", bg: "bg-pink-50", text: "text-pink-800" },
+        Transporte: { border: "border-teal-500", bg: "bg-teal-50", text: "text-teal-800" },
+        Alojamiento: { border: "border-blue-500", bg: "bg-blue-50", text: "text-blue-800" },
+    };
+
     return (
         <div ref={ref} className="p-10 bg-white text-black font-sans w-[210mm]">
             <style>{`
@@ -60,29 +71,54 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
                     .printable-section { page-break-inside: avoid; }
                     .printable-activity { page-break-inside: avoid; }
                 }
+                body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             `}</style>
             <div className="text-center border-b-2 border-gray-300 pb-4 mb-6">
-                <h1 className="text-4xl font-bold">{tripData.destination}</h1>
+                <h1 className="text-4xl font-bold text-blue-800">{tripData.destination}</h1>
                 <p className="text-lg text-gray-600">Resumen del Viaje</p>
             </div>
 
             <div className="grid grid-cols-3 gap-4 mb-8 text-sm printable-section">
-                <div className="bg-gray-100 p-3 rounded-md">
-                    <h3 className="font-bold text-gray-700">Fechas del Viaje</h3>
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+                    <h3 className="font-bold text-blue-700">Fechas del Viaje</h3>
                     <p>{`${format(parseISO(tripData.startDate), "d MMM", { locale: es })} - ${format(parseISO(tripData.endDate), "d MMM yyyy", { locale: es })}`}</p>
                 </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                    <h3 className="font-bold text-gray-700">Viajeros</h3>
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+                    <h3 className="font-bold text-blue-700">Viajeros</h3>
                     <p>{travelersValue}</p>
                 </div>
-                <div className="bg-gray-100 p-3 rounded-md">
-                    <h3 className="font-bold text-gray-700">Propósito</h3>
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
+                    <h3 className="font-bold text-blue-700">Propósito</h3>
                     <p>{tripData.purpose || "No especificado"}</p>
                 </div>
             </div>
 
             <div className="mb-8 printable-section">
-                <h2 className="text-2xl font-bold border-b border-gray-200 pb-2 mb-3">Resumen de Presupuesto</h2>
+                <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3">Preparativos del Viaje</h2>
+                {preparationsSummary.allItems.length > 0 ? (
+                    <div className="space-y-4">
+                        {preparationsSummary.pendingItems.length > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                                <h3 className="font-bold text-lg mb-2 text-yellow-800">Pendientes ({preparationsSummary.pendingItems.length})</h3>
+                                <ul className="list-disc list-inside text-yellow-900 space-y-1">
+                                    {preparationsSummary.pendingItems.map(item => <li key={item.id}><strong>{item.category}:</strong> {item.name}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                        {preparationsSummary.completedItems.length > 0 && (
+                            <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                <h3 className="font-bold text-lg mb-2 text-gray-600">Completados ({preparationsSummary.completedItems.length})</h3>
+                                <ul className="list-disc list-inside text-gray-500 line-through space-y-1">
+                                    {preparationsSummary.completedItems.map(item => <li key={item.id}><strong>{item.category}:</strong> {item.name}</li>)}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                ) : <p className="text-gray-500">No hay preparativos en la lista.</p>}
+            </div>
+
+            <div className="mb-8 printable-section">
+                <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3">Resumen de Presupuesto</h2>
                 {budgetSummary.totalBudget > 0 ? (
                     <div className="flex justify-between items-center text-xl font-bold bg-green-100 text-green-800 p-4 rounded-lg">
                         <span>Presupuesto Total Estimado:</span>
@@ -92,23 +128,31 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
             </div>
 
             <div className="mb-8 printable-section">
-                <h2 className="text-2xl font-bold border-b border-gray-200 pb-2 mb-3">Lista de Empaque</h2>
+                <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3">Lista de Empaque</h2>
                 {packingSummary.totalItems > 0 ? (
-                    <div>
-                        <h3 className="font-bold text-lg mb-2">Por Empacar ({packingSummary.unpackedItems.length})</h3>
-                        <ul className="list-disc list-inside text-gray-700 space-y-1">
-                            {packingSummary.unpackedItems.map(item => <li key={item.id}>{item.name} (x{item.quantity}) - {item.priority}</li>)}
-                        </ul>
-                        <h3 className="font-bold text-lg mt-4 mb-2">Empacado ({packingSummary.packedItems.length})</h3>
-                        <ul className="list-disc list-inside text-gray-500 line-through space-y-1">
-                            {packingSummary.packedItems.map(item => <li key={item.id}>{item.name} (x{item.quantity})</li>)}
-                        </ul>
+                     <div className="space-y-4">
+                        {packingSummary.unpackedItems.length > 0 && (
+                            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                                <h3 className="font-bold text-lg mb-2 text-yellow-800">Por Empacar ({packingSummary.unpackedItems.length})</h3>
+                                <ul className="list-disc list-inside text-yellow-900 space-y-1">
+                                    {packingSummary.unpackedItems.map(item => <li key={item.id}>{item.name} (x{item.quantity}) - <span className="font-medium">{item.priority}</span></li>)}
+                                </ul>
+                            </div>
+                        )}
+                        {packingSummary.packedItems.length > 0 && (
+                           <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                                <h3 className="font-bold text-lg mb-2 text-gray-600">Empacado ({packingSummary.packedItems.length})</h3>
+                                <ul className="list-disc list-inside text-gray-500 line-through space-y-1">
+                                    {packingSummary.packedItems.map(item => <li key={item.id}>{item.name} (x{item.quantity})</li>)}
+                                </ul>
+                            </div>
+                        )}
                     </div>
                 ) : <p className="text-gray-500">Lista de empaque vacía.</p>}
             </div>
 
             <div>
-                <h2 className="text-2xl font-bold border-b border-gray-200 pb-2 mb-3">Itinerario Detallado</h2>
+                <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2 mb-3">Itinerario Detallado</h2>
                 {sortedItinerary.map((dailyPlan, index) => {
                     const dayActivities = getActivitiesForDate(dailyPlan.date);
                     const sortedDayActivities = [...dayActivities].sort((a, b) => {
@@ -125,23 +169,26 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
                     
                     return (
                         <div key={dailyPlan.date} className="mb-6 printable-section">
-                            <h3 className="text-xl font-semibold bg-gray-200 p-3 rounded-md">
+                            <h3 className="text-xl font-semibold bg-blue-100 text-blue-800 p-3 rounded-md">
                                 Día {index + 1}: {format(parseISO(dailyPlan.date), "EEEE, d 'de' MMMM", { locale: es })}
                             </h3>
                             <div className="pl-4 mt-3 space-y-3">
-                                {sortedDayActivities.length > 0 ? sortedDayActivities.map(activity => (
-                                    <div key={activity.id} className="border-l-2 border-blue-300 pl-4 py-2 printable-activity">
-                                        <p className="font-bold">{activity.name} <span className="text-sm font-normal text-gray-600">({activity.type}{activity.mealType ? ` - ${activity.mealType}`: ''})</span></p>
-                                        <div className="text-sm text-gray-700 space-y-1 mt-1">
-                                            {activity.startTime && <p><strong>Horario:</strong> {activity.startTime}{activity.endTime && ` - ${activity.endTime}`}</p>}
-                                            {activity.location && <p><strong>Lugar:</strong> {activity.location}</p>}
-                                            {activity.cityRegion && <p><strong>Ciudad:</strong> {activity.cityRegion}</p>}
-                                            {activity.address && <p><strong>Dirección:</strong> {activity.address}</p>}
-                                            {activity.budget && activity.budget > 0 && <p><strong>Presupuesto:</strong> ${activity.budget.toLocaleString()}</p>}
-                                            {activity.notes && <p><strong>Notas:</strong> {activity.notes}</p>}
+                                {sortedDayActivities.length > 0 ? sortedDayActivities.map(activity => {
+                                    const styles = activityTypePrintableStyles[activity.type] || { border: 'border-gray-500', bg: 'bg-gray-50', text: 'text-gray-800' };
+                                    return (
+                                        <div key={activity.id} className={`p-3 rounded-md border-l-4 printable-activity ${styles.border} ${styles.bg}`}>
+                                            <p className={`font-bold ${styles.text}`}>{activity.name} <span className="text-sm font-normal text-gray-600">({activity.type}{activity.mealType ? ` - ${activity.mealType}`: ''})</span></p>
+                                            <div className="text-sm text-gray-700 space-y-1 mt-1">
+                                                {activity.startTime && <p><strong>Horario:</strong> {activity.startTime}{activity.endTime && ` - ${activity.endTime}`}</p>}
+                                                {activity.location && <p><strong>Lugar:</strong> {activity.location}</p>}
+                                                {activity.cityRegion && <p><strong>Ciudad:</strong> {activity.cityRegion}</p>}
+                                                {activity.address && <p><strong>Dirección:</strong> {activity.address}</p>}
+                                                {activity.budget && activity.budget > 0 && <p><strong>Presupuesto:</strong> ${activity.budget.toLocaleString()}</p>}
+                                                {activity.notes && <p><strong>Notas:</strong> {activity.notes}</p>}
+                                            </div>
                                         </div>
-                                    </div>
-                                )) : <p className="text-gray-500">No hay actividades planificadas para este día.</p>}
+                                    )
+                                }) : <p className="text-gray-500">No hay actividades planificadas para este día.</p>}
                             </div>
                         </div>
                     );
@@ -283,6 +330,17 @@ export default function SummaryPage() {
       packedPercentage,
     };
   }, [activeTripData?.packingList]);
+
+  const preparationsSummary = useMemo(() => {
+    if (!activeTripData?.preparations) {
+      return { allItems: [], completedItems: [], pendingItems: [] };
+    }
+    const allItems = [...activeTripData.preparations].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+    const completedItems = allItems.filter(item => item.completed);
+    const pendingItems = allItems.filter(item => !item.completed);
+
+    return { allItems, completedItems, pendingItems };
+  }, [activeTripData?.preparations]);
 
 
   if (isLoading && !activeTripData) {
@@ -509,8 +567,15 @@ export default function SummaryPage() {
       fullTripDetails += "\n";
     });
 
+    let preparationsText = "No hay preparativos específicos listados.";
+    if (activeTripData.preparations && activeTripData.preparations.length > 0) {
+        preparationsText = activeTripData.preparations
+            .map(p => `${p.category} - ${p.name}: ${p.completed ? 'Completado' : 'Pendiente'}`)
+            .join('\n');
+    }
+
     try {
-      const result = await generateTripNarrative({ fullTripDetails });
+      const result = await generateTripNarrative({ fullTripDetails, preparationsList: preparationsText });
       setTripNarrative(result.narrative);
       setIsNarrativeDialogOpen(true);
       toast({ title: "Narración Generada", description: "Tu historia de viaje está lista." });
@@ -530,9 +595,6 @@ export default function SummaryPage() {
     setIsDownloadingPdf(true);
 
     try {
-        const { default: jsPDF } = await import('jspdf');
-        const { default: html2canvas } = await import('html2canvas');
-
         const canvas = await html2canvas(printableRef.current, {
             scale: 2,
             useCORS: true,
@@ -738,6 +800,60 @@ export default function SummaryPage() {
           <Separator className="my-6" />
 
           <section className="mb-8">
+            <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><ClipboardList className="mr-2 h-6 w-6 text-primary" />Preparativos</h2>
+            {preparationsSummary.allItems.length > 0 ? (
+                <div className="space-y-2">
+                    {preparationsSummary.pendingItems.length > 0 && (
+                        <Card className="bg-muted/30">
+                            <CardHeader className="p-4"><CardTitle className="text-lg font-headline">Pendientes</CardTitle></CardHeader>
+                            <CardContent className="pt-0 px-4 pb-4">
+                                <ul className="space-y-2">
+                                    {preparationsSummary.pendingItems.map(item => (
+                                        <li key={item.id} className="text-sm flex items-center p-2 rounded-md bg-background">
+                                            <CheckSquare className="inline mr-3 h-4 w-4 text-muted-foreground opacity-50" />
+                                            <strong>{item.category}:</strong><span className="ml-2">{item.name}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {preparationsSummary.completedItems.length > 0 && (
+                        <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="completed-preps" className="border rounded-lg bg-card">
+                                <AccordionTrigger className="text-lg font-semibold hover:no-underline p-4">
+                                    <div className="flex items-center">
+                                        <span>Tareas Completadas</span>
+                                        <Badge variant="secondary" className="ml-3">{preparationsSummary.completedItems.length}</Badge>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="px-4 pb-4">
+                                    <ul className="space-y-2">
+                                        {preparationsSummary.completedItems.map(item => (
+                                            <li key={item.id} className="text-sm flex items-center p-2 rounded-md bg-background text-muted-foreground line-through">
+                                                <CheckSquare className="inline mr-3 h-4 w-4 text-green-500" />
+                                                <strong>{item.category}:</strong><span className="ml-2">{item.name}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+                    )}
+                </div>
+            ) : (
+              <p className="text-muted-foreground">No has añadido ninguna tarea de preparación.</p>
+            )}
+            <Link href="/plan/preparations" passHref>
+              <Button variant="link" className="mt-4 p-0 h-auto text-primary items-center">
+                Ver/Editar Preparativos <ArrowRight className="ml-1 h-3 w-3"/>
+              </Button>
+            </Link>
+          </section>
+
+          <Separator className="my-6" />
+
+          <section className="mb-8">
             <h2 className="text-2xl font-semibold font-headline mb-4 flex items-center"><Briefcase className="mr-2 h-6 w-6 text-primary" />Lista de Empaque</h2>
             {packingSummary.totalItems > 0 ? (
               <div className="space-y-4">
@@ -925,12 +1041,13 @@ export default function SummaryPage() {
       </Card>
       
       {/* Hidden component for PDF generation */}
-      <div className="fixed -left-[9999px] top-auto h-auto w-auto opacity-0" aria-hidden="true">
+      <div className="fixed -left-[9999px] top-auto h-auto w-auto opacity-0" aria-hidden={isDownloadingPdf ? "false" : "true"}>
         <PrintableSummary 
             ref={printableRef}
             tripData={activeTripData}
             budgetSummary={budgetSummary}
             packingSummary={packingSummary}
+            preparationsSummary={preparationsSummary}
             getActivitiesForDate={getActivitiesForDate}
         />
       </div>
@@ -955,5 +1072,3 @@ function InfoItem({ icon, label, value }: InfoItemProps) {
     </div>
   );
 }
-
-

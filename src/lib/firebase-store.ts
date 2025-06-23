@@ -1,7 +1,8 @@
 
+
 import { database } from './firebase';
 import { ref, set, get, push, remove, serverTimestamp } from 'firebase/database';
-import type { FullTripData, TripBase, UserTrips, DailyPlan, ActivityItem, Travelers } from './types';
+import type { FullTripData, TripBase, UserTrips, DailyPlan, ActivityItem, Travelers, PreparationItem, ChecklistItem } from './types';
 import { format, parseISO } from 'date-fns';
 
 const USER_DATA_ROOT = 'users';
@@ -88,6 +89,13 @@ export async function saveTripForUser(userId: string, tripId: string, tripData: 
     tollsBudget: act.tollsBudget ?? null,
   }));
 
+  const sanitizedPreparations = (tripData.preparations || []).map((prep): PreparationItem => ({
+      ...prep,
+      notes: prep.notes ?? null,
+      dueDate: prep.dueDate ?? null,
+      checklist: (prep.checklist || []).map(item => ({...item})) ?? null,
+  }));
+
   const dataToSave: FullTripData & { travelers: Travelers } = {
     ...tripData, // Spread original trip data first
     destination: tripData.destination || "", // Ensure destination is at least an empty string
@@ -102,6 +110,7 @@ export async function saveTripForUser(userId: string, tripId: string, tripData: 
     },
     summaryImageUri: tripData.summaryImageUri || "", 
     packingList: tripData.packingList || [],
+    preparations: sanitizedPreparations,
     itinerary: (tripData.itinerary || []).map(plan => ({
       date: plan.date,
       notes: plan.notes || '',
@@ -167,6 +176,12 @@ export async function loadTripsForUser(userId: string): Promise<UserTrips | null
           dayImageUri: dp.dayImageUri === "" || dp.dayImageUri === null ? undefined : dp.dayImageUri,
       }));
       trip.packingList = trip.packingList || [];
+      trip.preparations = (trip.preparations || []).map(prep => ({
+          ...prep,
+          notes: prep.notes === null ? undefined : prep.notes,
+          dueDate: prep.dueDate === null ? undefined : prep.dueDate,
+          checklist: prep.checklist === null ? undefined : prep.checklist,
+      }));
       trip.summaryImageUri = trip.summaryImageUri === "" || trip.summaryImageUri === null ? undefined : trip.summaryImageUri;
       trip.travelers = trip.travelers || undefined;
     });
@@ -190,6 +205,7 @@ export async function createNewTripForUserFirebase(userId: string, tripDetails: 
     userId: userId,
     createdAt: serverTimestamp() as unknown as number, 
     packingList: [],
+    preparations: [],
     itinerary: generateItineraryShell(tripDetails.startDate, tripDetails.endDate),
     activities: [],
     summaryImageUri: undefined,
@@ -208,6 +224,7 @@ export async function createNewTripForUserFirebase(userId: string, tripDetails: 
       seniors: newFullTripData.travelers?.seniors || 0,
     },
     summaryImageUri: newFullTripData.summaryImageUri || "", 
+    preparations: (newFullTripData.preparations || []).map(p => ({...p, notes: p.notes ?? null, dueDate: p.dueDate ?? null, checklist: p.checklist ?? null})),
     itinerary: newFullTripData.itinerary.map(plan => ({ 
         ...plan, 
         notes: plan.notes || '',

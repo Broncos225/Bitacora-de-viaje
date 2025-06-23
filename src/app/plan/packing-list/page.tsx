@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -10,8 +9,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { PackingItemForm } from "@/components/forms/PackingItemForm";
 import { PackingListItemRow } from "@/components/planning/PackingListItemRow";
 import { PlusCircle, Backpack, Plane } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 
@@ -119,28 +116,26 @@ export default function PackingListPage() {
               Tu lista de empaque está vacía. ¡Añade tu primer artículo!
             </p>
           ) : (
-            <ScrollArea className="h-[calc(100vh-20rem)] md:h-[calc(100vh-22rem)]"> {/* Adjust height as needed */}
-              <div className="space-y-6 pr-4">
-                {groupedItems.map(group => (
-                  group.items.length > 0 && (
-                    <div key={group.priority}>
-                      <h3 className="text-xl font-semibold font-headline mb-2 border-b pb-1">{group.priority} Prioridad</h3>
-                      <div className="space-y-2">
-                        {group.items.map(item => (
-                          <PackingListItemRow
-                            key={item.id}
-                            item={item}
-                            onTogglePacked={(packed) => updatePackingItem({ ...item, packed })}
-                            onEdit={() => handleEditItem(item)}
-                            onRemove={() => removePackingItem(item.id)}
-                          />
-                        ))}
-                      </div>
+            <div className="space-y-6">
+              {groupedItems.map(group => (
+                group.items.length > 0 && (
+                  <div key={group.priority}>
+                    <h3 className="text-xl font-semibold font-headline mb-2 border-b pb-1">{group.priority} Prioridad</h3>
+                    <div className="space-y-2">
+                      {group.items.map(item => (
+                        <PackingListItemRow
+                          key={item.id}
+                          item={item}
+                          onTogglePacked={(packed) => updatePackingItem({ ...item, packed })}
+                          onEdit={() => handleEditItem(item)}
+                          onRemove={() => removePackingItem(item.id)}
+                        />
+                      ))}
                     </div>
-                  )
-                ))}
-              </div>
-            </ScrollArea>
+                  </div>
+                )
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

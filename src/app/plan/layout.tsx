@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, ClipboardList, ListChecks, LogOut, Settings, Plane, UserCircle, LogIn, Trash2, PlusCircle, List } from "lucide-react"; // BedDouble eliminado
+import { CalendarDays, ClipboardList, ListChecks, LogOut, Settings, Plane, UserCircle, LogIn, Trash2, PlusCircle, List, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle as SheetTitleComponent } from "@/components/ui/sheet"; 
@@ -27,9 +28,9 @@ import {
 
 const planningNavItems = [
   { href: "/plan/itinerary", label: "Itinerario", icon: CalendarDays },
-  // { href: "/plan/accommodations", label: "Alojamientos", icon: BedDouble }, // Eliminado
+  { href: "/plan/preparations", label: "Preparativos", icon: ClipboardList },
   { href: "/plan/packing-list", label: "Lista de Empaque", icon: ListChecks },
-  { href: "/plan/summary", label: "Resumen del Viaje", icon: ClipboardList },
+  { href: "/plan/summary", label: "Resumen del Viaje", icon: FileText },
 ];
 
 const generalNavItems = [
@@ -237,7 +238,7 @@ function PlanningLayoutContent({ children }: { children: React.ReactNode }) {
         </aside>
       )}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto bg-background">
-        {user && !isTripDataLoading && !activeTripData && !pathname.startsWith('/plan/new') && !pathname.startsWith('/plan/trips') && (
+        {user && !isTripDataLoading && !activeTripData && !pathname.startsWith('/plan/new') && !pathname.startsWith('/plan/trips') && !pathname.startsWith('/plan/preparations') && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <Plane className="w-24 h-24 text-muted-foreground mb-6" />
             <h2 className="text-2xl font-semibold mb-2">No hay un viaje activo seleccionado</h2>
@@ -261,7 +262,7 @@ function PlanningLayoutContent({ children }: { children: React.ReactNode }) {
            )
            OR if user is not authenticated yet but auth is still loading (to prevent flicker)
         */}
-         { (user && (pathname.startsWith('/plan/new') || pathname.startsWith('/plan/trips') || activeTripData)) || (isAuthLoading && !user) ? children : null }
+         { (user && (pathname.startsWith('/plan/new') || pathname.startsWith('/plan/trips') || pathname.startsWith('/plan/preparations') || activeTripData)) || (isAuthLoading && !user) ? children : null }
       </main>
     </div>
   );
@@ -277,5 +278,3 @@ export default function PlanningLayout({
 
 export { AlertDialogTitleComponentImport as AlertDialogTitle };
 export const canAccessPlanningTools = false; // This export is not actually used by the component internally now
-
-    

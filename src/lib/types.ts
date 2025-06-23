@@ -1,4 +1,5 @@
 
+
 export interface Travelers {
   men?: number;
   women?: number;
@@ -26,6 +27,24 @@ export interface PackingListItem {
   quantity: number;
   priority: 'Alta' | 'Media' | 'Baja';
   packed: boolean;
+}
+
+export type PreparationCategory = 'Reservas' | 'Documentos' | 'Finanzas' | 'Salud' | 'Hogar' | 'Vehículo' | 'Otro';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface PreparationItem {
+    id: string;
+    name: string;
+    category: PreparationCategory;
+    completed: boolean;
+    notes?: string;
+    dueDate?: string; // YYYY-MM-DD
+    checklist?: ChecklistItem[];
 }
 
 export type ActivityType = 'Actividad' | 'Comida' | 'Compras' | 'Transporte' | 'Alojamiento';
@@ -89,6 +108,7 @@ export interface DailyPlan {
 
 export interface FullTripData extends Trip {
   packingList: PackingListItem[];
+  preparations?: PreparationItem[]; // NUEVO: Lista de preparativos
   itinerary: DailyPlan[];
   activities: ActivityItem[];
   summaryImageUri?: string; // Imagen del resumen general del viaje
