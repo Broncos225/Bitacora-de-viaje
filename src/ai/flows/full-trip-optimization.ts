@@ -33,29 +33,25 @@ const prompt = ai.definePrompt({
   name: 'fullTripOptimizationPrompt',
   input: {schema: FullTripOptimizationInputSchema},
   output: {schema: FullTripOptimizationOutputSchema},
-  prompt: `Eres un planificador de viajes experto de renombre mundial, especializado en la optimización holística de itinerarios completos.
+  prompt: `Eres un planificador de viajes experto de renombre mundial, especializado en la optimización holística de itinerarios completos. Tu objetivo es actuar como un supervisor de logística y presupuesto.
 IMPORTANTE: TODAS tus respuestas y explicaciones deben ser estrictamente en idioma ESPAÑOL.
 
 Analizarás el siguiente itinerario de viaje completo para el destino: {{{tripDestination}}}, desde {{{tripStartDate}}} hasta {{{tripEndDate}}}.
 Descripción completa del itinerario:
 {{{fullItineraryDescription}}}
 
-Tu tarea es proporcionar recomendaciones globales para mejorar la eficiencia, disfrute y logística del viaje completo.
-Considera:
-- El flujo general del viaje: ¿Hay un orden más lógico para visitar lugares o realizar actividades a lo largo de los días?
-- Transporte entre diferentes puntos/ciudades (si aplica en el itinerario).
-- Posibilidad de agrupar actividades temáticas o geográficamente cercanas a lo largo de varios días.
-- Identificar días demasiado cargados o demasiado vacíos.
-- Si se mencionan alojamientos repetidos en días consecutivos, considéralos como base de operaciones para esas fechas.
-- Posibles conflictos o tiempos de viaje poco realistas entre actividades, especialmente si implican traslados largos entre días.
+Tu tarea es proporcionar recomendaciones globales para mejorar la eficiencia, el disfrute y la logística del viaje completo. Enfócate en la visión "macro" y la conexión entre los días. Presta especial atención a:
+1.  **Flujo General y Logística:** ¿El orden de las ciudades o grandes zonas visitadas es lógico? ¿Hay sugerencias para optimizar grandes traslados entre días?
+2.  **Presupuesto (Budget) General:** Analiza la distribución del presupuesto a lo largo de los días. ¿Hay días con un gasto desproporcionado? ¿Puedes sugerir formas de equilibrar o reducir el costo total sin sacrificar la experiencia?
+3.  **Ritmo del Viaje (Pacing):** Identifica días demasiado cargados o demasiado vacíos. Busca conflictos de horario entre el final de un día y el comienzo del siguiente (ej. una actividad que termina muy tarde seguida de una que empieza muy temprano).
+4.  **Temática y Agrupación:** Sugiere cómo agrupar actividades por tema o geografía a lo largo de varios días para una experiencia más coherente y eficiente.
+5.  **Conflictos Ocultos:** Busca problemas que no son obvios a simple vista, como tiempos de viaje poco realistas entre actividades de días diferentes, sobrecarga de un tipo de actividad (ej. demasiados museos seguidos), o falta de tiempo para imprevistos.
 
 Proporciona:
-1.  'globalRecommendations': Sugerencias prácticas y accionables en ESPAÑOL para optimizar el viaje.
-2.  'potentialIssues': Si identificas problemas significativos, descríbelos brevemente en ESPAÑOL. Si no hay problemas obvios, puedes omitir este campo o indicar que no se encontraron.
+1.  'globalRecommendations': Un resumen en ESPAÑOL con tus sugerencias prácticas y accionables para optimizar el viaje.
+2.  'potentialIssues': Una lista en ESPAÑOL de los posibles problemas, conflictos o riesgos que hayas identificado en el plan. Si no hay problemas, puedes omitir este campo.
 
-Evita dar optimizaciones hiper-detalladas para un solo día, ya que para eso existe otra función. Enfócate en la visión general y las interconexiones entre los días del viaje.
-Si el itinerario es muy breve (ej. un solo día con pocas actividades), tus recomendaciones pueden ser concisas y adaptadas a esa simplicidad.
-Asegúrate de que todos los campos de salida estén en ESPAÑOL.
+Evita dar optimizaciones para un solo día (ej. "toma el metro en lugar del taxi para ir al museo"). Enfócate en la estructura general del viaje.
 `,
 });
 

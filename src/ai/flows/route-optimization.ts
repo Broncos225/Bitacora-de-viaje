@@ -32,21 +32,25 @@ const prompt = ai.definePrompt({
   name: 'routeOptimizationPrompt',
   input: {schema: RouteOptimizationInputSchema},
   output: {schema: RouteOptimizationOutputSchema},
-  prompt: `Eres un planificador de viajes experto especializado en la optimización de rutas.
-IMPORTANTE: TODAS tus respuestas y explicaciones deben ser estrictamente en idioma ESPAÑOL. Esto incluye cualquier texto en los campos optimizedRoute, estimatedTimeSavings, y estimatedCostSavings.
+  prompt: `Eres un planificador de viajes experto y un asistente logístico de élite, especializado en la optimización de rutas diarias.
+IMPORTANTE: TODAS tus respuestas y explicaciones deben ser estrictamente en idioma ESPAÑOL.
 
-Utilizarás la información del itinerario diario proporcionado para sugerir las rutas y opciones de transporte más eficientes.
-Si en el itinerario se mencionan nombres de ciudades o lugares que podrían ser ambiguos o demasiado generales (ej. solo el nombre de una ciudad), intenta contextualizarlos con mayor precisión geográfica (ej. Ciudad, Región/Estado, País) para ofrecer una optimización más precisa y relevante.
+Tu tarea es analizar en detalle el siguiente itinerario de un día y proponer la ruta más eficiente posible. Presta especial atención a:
+1.  **Orden de las Actividades:** Sugiere un orden lógico para minimizar el tiempo y costo de desplazamiento.
+2.  **Tiempos y Horarios:** Verifica si los horarios (startTime, endTime) son realistas. ¿Hay suficiente tiempo para ir de un lugar a otro? ¿Hay conflictos de solapamiento?
+3.  **Presupuesto (Budget):** Considera los presupuestos asignados a cada actividad. Si ves una opción de transporte o una ruta que pueda reducir costos, menciónala.
+4.  **Ubicaciones:** Utiliza los nombres de lugares, direcciones y ciudades para entender la geografía del día. Si se proveen coordenadas, úsalas como referencia principal.
+5.  **Contexto Adicional:** Toma en cuenta los detalles extra como el tipo de cocina, categoría de la actividad, etc., para dar recomendaciones más inteligentes (ej. no sugerir un almuerzo pesado justo antes de una actividad física intensa).
 
-Si una actividad de 'Alojamiento' con el mismo nombre y/o ubicación aparece en días consecutivos dentro del itinerario que se te proporciona (si abarca varios días), considera ese lugar como la base de operaciones para esos días al optimizar otras actividades.
+Itinerario del Día:
+{{{dailyItinerary}}}
 
-Considera factores como el tiempo de viaje, el costo y la conveniencia.
+Basado en tu análisis, proporciona:
+- **optimizedRoute:** Una descripción detallada de la ruta optimizada sugerida, el orden de las actividades y las opciones de transporte recomendadas. Si encuentras conflictos de tiempo o presupuesto, explícalos aquí.
+- **estimatedTimeSavings:** Una estimación del tiempo que se podría ahorrar.
+- **estimatedCostSavings:** Una estimación del ahorro en costos (si aplica).
 
-Itinerario: {{{dailyItinerary}}}
-
-Proporciona una ruta optimizada detallada, incluyendo sugerencias de transporte, estimaciones de ahorro de tiempo y estimaciones de ahorro de costos.
-Si el itinerario proporcionado contiene muy pocas actividades (por ejemplo, solo una, especialmente si es solo de alojamiento sin otras actividades que requieran desplazamiento) o no permite una optimización de ruta significativa entre múltiples puntos, indícalo claramente en el campo 'optimizedRoute' explicando qué información adicional se necesitaría (por ejemplo, un punto de partida y destino, o más actividades). En tales casos, para 'estimatedTimeSavings' y 'estimatedCostSavings', puedes usar "No aplica" o una breve explicación, siempre en español.
-Asegúrate de que todos los campos de salida estén en español.
+Si el itinerario es demasiado simple para optimizar (ej. una sola actividad), explícalo en 'optimizedRoute' y pon "No aplica" en los otros campos. Asegúrate de que todas tus respuestas estén en español.
 `,
 });
 
@@ -61,4 +65,3 @@ const routeOptimizationFlow = ai.defineFlow(
     return output!;
   }
 );
-

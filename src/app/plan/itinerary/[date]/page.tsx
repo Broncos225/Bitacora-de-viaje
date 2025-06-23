@@ -78,11 +78,19 @@ export default function DayPlanPage() {
         return isWithinInterval(currentDayDate, { start: activityStartDate, end: activityEndDate });
       })
       .sort((a, b) => {
-        if (a.type === 'Alojamiento' && b.type !== 'Alojamiento') return -1;
-        if (a.type !== 'Alojamiento' && b.type === 'Alojamiento') return 1;
-        if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime);
-        if (a.startTime) return -1;
-        if (b.startTime) return 1;
+        const aHasTime = !!a.startTime;
+        const bHasTime = !!b.startTime;
+
+        if (aHasTime && !bHasTime) return -1;
+        if (!aHasTime && bHasTime) return 1;
+
+        if (aHasTime && bHasTime) {
+            const timeComparison = a.startTime!.localeCompare(b.startTime!);
+            if (timeComparison !== 0) {
+                return timeComparison;
+            }
+        }
+        
         return a.name.localeCompare(b.name);
       });
   }, [activeTripData, date]);
@@ -124,39 +132,33 @@ export default function DayPlanPage() {
     }
     setIsOptimizing(true);
     try {
-      let itineraryDescription = activitiesForThisDay.map(act => {
-        let locationParts: string[] = [];
-        if (act.location) locationParts.push(act.location);
-        if (act.cityRegion) locationParts.push(act.cityRegion);
-        if (act.address) locationParts.push(`(Dirección: ${act.address})`);
-
-        let description = `${act.type}: ${act.name}`;
-        if (locationParts.length > 0) {
-          description += ` en ${locationParts.join(', ')}`;
-        }
+      const itineraryDescription = activitiesForThisDay.map(act => {
+        let parts = [`- Tipo: ${act.type}`, `Nombre: ${act.name}`];
+        if (act.startTime) parts.push(`Hora Inicio: ${act.startTime}`);
+        if (act.endTime) parts.push(`Hora Fin: ${act.endTime}`);
         
-        const activityDayDate = parseISO(date);
-        const activityStartDate = parseISO(act.startDate);
-        const activityEndDate = parseISO(act.endDate);
+        let locationInfo = [];
+        if (act.location) locationInfo.push(act.location);
+        if (act.cityRegion) locationInfo.push(act.cityRegion);
+        if (act.address) locationInfo.push(act.address);
+        if (locationInfo.length > 0) parts.push(`Ubicación: ${locationInfo.join(', ')}`);
 
-        let timeInfo = "";
-        if (act.type === 'Alojamiento') {
-            if (format(activityDayDate, 'yyyy-MM-dd') === format(activityStartDate, 'yyyy-MM-dd') && act.startTime) {
-                timeInfo += ` (Check-in: ${act.startTime})`;
-            }
-            if (format(activityDayDate, 'yyyy-MM-dd') === format(activityEndDate, 'yyyy-MM-dd') && act.endTime) {
-                timeInfo += ` (Check-out: ${act.endTime})`;
-            }
-            if (!timeInfo) timeInfo = " (Estancia)";
-        } else {
-            if (act.startTime) timeInfo += ` de ${act.startTime}`;
-            if (act.endTime) timeInfo += ` a ${act.endTime}`;
-        }
-        description += timeInfo;
+        if (act.latitude && act.longitude) parts.push(`Coords: ${act.latitude}, ${act.longitude}`);
+        if (act.budget && act.budget > 0) parts.push(`Presupuesto: ${act.budget}`);
+        
+        // Add type-specific details
+        if (act.type === 'Transporte' && act.transportationMode) parts.push(`Modo de Transporte: ${act.transportationMode}`);
+        if (act.type === 'Transporte' && act.gasolineBudget && act.gasolineBudget > 0) parts.push(`Presupuesto Gasolina: ${act.gasolineBudget}`);
+        if (act.type === 'Transporte' && act.tollsBudget && act.tollsBudget > 0) parts.push(`Presupuesto Peajes: ${act.tollsBudget}`);
+        if (act.type === 'Comida' && act.mealType) parts.push(`Tipo de Comida: ${act.mealType}`);
+        if (act.type === 'Comida' && act.cuisineType) parts.push(`Tipo de Cocina: ${act.cuisineType}`);
+        if (act.type === 'Comida' && act.dietaryNotes) parts.push(`Notas Dietéticas: ${act.dietaryNotes}`);
+        if (act.type === 'Actividad' && act.activityCategory) parts.push(`Categoría Actividad: ${act.activityCategory}`);
+        if (act.type === 'Compras' && act.shoppingCategory) parts.push(`Categoría Compras: ${act.shoppingCategory}`);
+        
+        if (act.notes) parts.push(`Notas: ${act.notes}`);
 
-        if (act.budget && act.budget > 0) description += ` (Presupuesto: ${act.budget})`;
-        if (act.notes) description += ` - Notas: ${act.notes}`;
-        return description;
+        return parts.join('; ');
       }).join('\n');
       
       const result = await routeOptimization({ dailyItinerary: itineraryDescription });
@@ -165,7 +167,6 @@ export default function DayPlanPage() {
         optimizedRoute: result.optimizedRoute,
         estimatedTimeSavings: result.estimatedTimeSavings,
         estimatedCostSavings: result.estimatedCostSavings,
-        routeCoordinates: result.routeCoordinates || [], 
       });
       toast({ title: "Optimización de IA Recibida", description: "Se ha sugerido una nueva ruta y optimización textual." });
     } catch (error) {
@@ -315,7 +316,6 @@ export default function DayPlanPage() {
                       optimizedRoute: '', 
                       estimatedTimeSavings: '', 
                       estimatedCostSavings: '',
-                      routeCoordinates: [] 
                     })}
                   >
                     Limpiar
@@ -329,5 +329,3 @@ export default function DayPlanPage() {
     </div>
   );
 }
-
-    

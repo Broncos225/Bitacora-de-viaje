@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -24,7 +23,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ManageTripsPage() {
-  const { allUserTrips, activeTripId, setActiveTrip, deleteTripForUser, isLoading, isOperating } = useTripData();
+  const { allUserTrips, activeTripId, setActiveTrip, deleteActiveTrip, isLoading, isOperating } = useTripData();
   const router = useRouter();
 
   if (isLoading && !allUserTrips) {
@@ -178,7 +177,7 @@ export default function ManageTripsPage() {
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction 
-                              onClick={() => deleteTripForUser()} // Esto elimina el viaje ACTIVO
+                              onClick={() => deleteActiveTrip()} // Esto elimina el viaje ACTIVO
                               disabled={isOperating || trip.id !== activeTripId}
                               className="bg-destructive hover:bg-destructive/90"
                             >

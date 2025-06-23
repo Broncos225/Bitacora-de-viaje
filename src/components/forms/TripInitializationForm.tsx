@@ -39,6 +39,12 @@ const tripFormSchema = z.object({
     required_error: "La fecha de fin es requerida.",
   }),
   purpose: z.string().optional(),
+  travelers: z.object({
+    men: z.coerce.number().int().min(0, "Debe ser un número positivo.").optional(),
+    women: z.coerce.number().int().min(0, "Debe ser un número positivo.").optional(),
+    children: z.coerce.number().int().min(0, "Debe ser un número positivo.").optional(),
+    seniors: z.coerce.number().int().min(0, "Debe ser un número positivo.").optional(),
+  }).optional(),
 }).refine(data => data.endDate >= data.startDate, {
   message: "La fecha de fin no puede ser anterior a la fecha de inicio.",
   path: ["endDate"],
@@ -65,9 +71,11 @@ export function TripInitializationForm({ initialData }: TripInitializationFormPr
       startDate: parseISO(initialData.startDate),
       endDate: parseISO(initialData.endDate),
       purpose: initialData.purpose || "",
+      travelers: initialData.travelers || { men: 0, women: 0, children: 0, seniors: 0 },
     } : {
       destination: "",
       purpose: "",
+      travelers: { men: 0, women: 0, children: 0, seniors: 0 },
       // startDate and endDate will be undefined by default, user must pick
     },
   });
@@ -81,6 +89,7 @@ export function TripInitializationForm({ initialData }: TripInitializationFormPr
         startDate: parseISO(initialData.startDate),
         endDate: parseISO(initialData.endDate),
         purpose: initialData.purpose || "",
+        travelers: initialData.travelers || { men: 0, women: 0, children: 0, seniors: 0 },
       });
     } else {
       form.reset({
@@ -88,6 +97,7 @@ export function TripInitializationForm({ initialData }: TripInitializationFormPr
         startDate: undefined,
         endDate: undefined,
         purpose: "",
+        travelers: { men: 0, women: 0, children: 0, seniors: 0 },
       });
     }
   }, [initialData, form]);
@@ -99,6 +109,7 @@ export function TripInitializationForm({ initialData }: TripInitializationFormPr
       startDate: format(values.startDate, "yyyy-MM-dd"),
       endDate: format(values.endDate, "yyyy-MM-dd"),
       purpose: values.purpose || "",
+      travelers: values.travelers,
     };
 
     if (isEditMode && initialData) {
@@ -249,6 +260,65 @@ export function TripInitializationForm({ initialData }: TripInitializationFormPr
             </FormItem>
           )}
         />
+
+        <div className="space-y-4 pt-6 border-t">
+          <h3 className="text-lg font-medium text-primary">Viajeros (Opcional)</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <FormField
+              control={form.control}
+              name="travelers.men"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Hombres</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="0" {...field} disabled={isOperating} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="travelers.women"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mujeres</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="0" {...field} disabled={isOperating} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="travelers.children"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Niños/as</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="0" {...field} disabled={isOperating} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="travelers.seniors"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ancianos/as</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="0" {...field} disabled={isOperating} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
         <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isOperating}>
           {isOperating ? (isEditMode ? "Guardando..." : "Creando...") : 
             (isEditMode ? <><Save className="mr-2 h-4 w-4" /> Guardar Cambios del Viaje</> : <><Rocket className="mr-2 h-4 w-4" /> Crear Viaje y Empezar a Planificar</>)

@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useTripData } from "@/hooks/use-trip-data";
 import type { DailyPlan, ActivityItem, ActivityType } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ActivityForm } from "@/components/forms/ActivityForm";
-import { CalendarDays, ArrowRight, Edit3, Plane, PlusCircle, CalendarRange, LayoutList, GanttChartSquare, Upload, ImageOff, MoreVertical, Map } from "lucide-react";
+import { CalendarDays, ArrowRight, Edit3, Plane, PlusCircle, CalendarRange, LayoutList, GanttChartSquare, Upload, ImageOff, MoreVertical, Map, FileText, Landmark, Building2, MapPin, BedDouble, Car, ShoppingCart, Utensils, Puzzle } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from 'date-fns/locale';
 import Image from "next/image";
@@ -24,6 +24,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import dynamic from 'next/dynamic';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
+
 
 const ActivityMapComponent = dynamic(() => import('@/components/planning/ActivityMap').then(mod => mod.ActivityMap), {
   ssr: false,
@@ -33,25 +36,62 @@ const ActivityMapComponent = dynamic(() => import('@/components/planning/Activit
 
 const activityTypes: ActivityType[] = ['Actividad', 'Comida', 'Compras', 'Transporte', 'Alojamiento'];
 
-interface DayCardProps {
+const activityTypeVisuals: Record<ActivityType, { border: string; text: string; icon: React.ElementType }> = {
+  Actividad: { border: "border-purple-500", text: "text-purple-700 dark:text-purple-300", icon: Puzzle },
+  Comida: { border: "border-orange-500", text: "text-orange-700 dark:text-orange-300", icon: Utensils },
+  Compras: { border: "border-pink-500", text: "text-pink-700 dark:text-pink-300", icon: ShoppingCart },
+  Transporte: { border: "border-teal-500", text: "text-teal-700 dark:text-teal-300", icon: Car },
+  Alojamiento: { border: "border-blue-500", text: "text-blue-700 dark:text-blue-300", icon: BedDouble },
+};
+
+
+interface DayAccordionItemProps {
   dailyPlan: DailyPlan;
   dayNumber: number;
   tripId: string;
   onUpdateDayImage: (date: string, imageUri: string | null) => void;
+  getActivitiesForDate: (date: string) => ActivityItem[];
 }
 
-function DayCard({ dailyPlan, dayNumber, tripId, onUpdateDayImage }: DayCardProps) {
+function DayAccordionItem({ dailyPlan, dayNumber, tripId, onUpdateDayImage, getActivitiesForDate }: DayAccordionItemProps) {
     const dayDate = parseISO(dailyPlan.date);
     const dayNumDisplay = `Día ${dayNumber}`;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { toast } = useToast();
     const [isUploading, setIsUploading] = useState(false);
 
-    const handleUploadButtonClick = () => {
+    const dayActivities = getActivitiesForDate(dailyPlan.date).sort((a, b) => {
+        // Prioritize items with a startTime
+        const aHasTime = !!a.startTime;
+        const bHasTime = !!b.startTime;
+
+        if (aHasTime && !bHasTime) return -1;
+        if (!aHasTime && bHasTime) return 1;
+
+        // If both have startTime, compare them
+        if (aHasTime && bHasTime) {
+            const timeComparison = a.startTime!.localeCompare(b.startTime!);
+            if (timeComparison !== 0) {
+                return timeComparison;
+            }
+        }
+
+        // If both are untimed, or have the same time, use secondary sorting.
+        // Place 'Alojamiento' first among untimed events.
+        if (a.type === 'Alojamiento' && b.type !== 'Alojamiento') return -1;
+        if (a.type !== 'Alojamiento' && b.type === 'Alojamiento') return 1;
+
+        // Fallback to sorting by name
+        return a.name.localeCompare(b.name);
+      });
+
+    const handleUploadButtonClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
       fileInputRef.current?.click();
     };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      event.stopPropagation();
       const file = event.target.files?.[0];
       if (file) {
         if (file.size > 1 * 1024 * 1024) { 
@@ -77,70 +117,106 @@ function DayCard({ dailyPlan, dayNumber, tripId, onUpdateDayImage }: DayCardProp
       }
     };
 
-    const handleRemoveImage = async () => {
+    const handleRemoveImage = async (e: React.MouseEvent) => {
+        e.stopPropagation();
         await onUpdateDayImage(dailyPlan.date, null);
         toast({title: "Imagen del Día Eliminada", description: `Se eliminó la imagen personalizada para el ${dayNumDisplay}.`})
     };
     
-    const imageSrc = dailyPlan.dayImageUri || `https://placehold.co/400x300.png?text=${encodeURIComponent(dayNumDisplay)}`;
+    const imageSrc = dailyPlan.dayImageUri || `https://placehold.co/64x64.png?text=Día+${dayNumber}`;
 
     return (
-      <Card className="overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col">
-        <div className="relative h-36 md:h-40 group">
-          <Image
-            src={imageSrc}
-            alt={`Plan del ${dayNumDisplay}`}
-            width={400}
-            height={300}
-            className="object-cover w-full h-full"
-            data-ai-hint="itinerary daily plan"
-            key={imageSrc} 
-          />
-           <div className="absolute top-1 right-1">
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/webp" style={{ display: 'none' }} />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 bg-background/70 hover:bg-background/90 text-foreground rounded-full">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleUploadButtonClick} disabled={isUploading}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  {isUploading ? "Subiendo..." : "Cambiar Imagen"}
-                </DropdownMenuItem>
-                {dailyPlan.dayImageUri && (
-                  <DropdownMenuItem onClick={handleRemoveImage} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                    <ImageOff className="mr-2 h-4 w-4" />
-                    Quitar Imagen
-                  </DropdownMenuItem>
+        <AccordionItem value={`day-${dayNumber}`} className="bg-card border-b-0 rounded-lg shadow-sm">
+            <AccordionTrigger className="hover:no-underline p-4 rounded-lg">
+                <div className="flex w-full items-center justify-between">
+                    <div className="flex items-center gap-4 text-left">
+                        <Image
+                            src={imageSrc}
+                            alt={`Imagen del Día ${dayNumber}`}
+                            width={56}
+                            height={56}
+                            className="rounded-md object-cover h-14 w-14"
+                            data-ai-hint="itinerary day small"
+                            key={imageSrc}
+                        />
+                        <div>
+                            <h3 className="text-lg font-semibold font-headline text-primary">
+                                Día {dayNumber}: {format(dayDate, "EEEE", { locale: es })}
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                                {format(dayDate, "d 'de' MMMM, yyyy", { locale: es })}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="relative mr-2">
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/png, image/jpeg, image/webp" style={{ display: 'none' }} />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <span
+                                    className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "h-8 w-8 rounded-full")}
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <MoreVertical className="h-4 w-4" />
+                                </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={handleUploadButtonClick} disabled={isUploading}>
+                                    <Upload className="mr-2 h-4 w-4" />
+                                    {isUploading ? "Subiendo..." : "Cambiar Imagen"}
+                                </DropdownMenuItem>
+                                {dailyPlan.dayImageUri && (
+                                    <DropdownMenuItem onClick={handleRemoveImage} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                        <ImageOff className="mr-2 h-4 w-4" />
+                                        Quitar Imagen
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+            </AccordionTrigger>
+            <AccordionContent className="pl-6 pr-4 pb-4 border-l-2 border-primary/20 ml-9">
+                {dailyPlan.notes && (
+                    <p className="text-sm italic text-muted-foreground mb-4 border border-dashed p-3 rounded-md bg-background">
+                        <FileText className="inline mr-2 h-4 w-4" />
+                        <span className="font-medium">Notas del día:</span> {dailyPlan.notes}
+                    </p>
                 )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        <div className="p-4 flex flex-col flex-grow justify-between">
-          <div>
-            <h3 className="text-lg font-semibold font-headline text-primary">
-              {dayNumDisplay}: {format(dayDate, "EEEE", { locale: es })}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {format(dayDate, "MMMM yyyy", { locale: es })}
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Ver detalles para actividades.
-            </p>
-            {dailyPlan.notes && <p className="text-xs mt-2 italic text-muted-foreground line-clamp-2">Notas: {dailyPlan.notes}</p>}
-          </div>
-          <div className="mt-3">
-            <Link href={`/plan/itinerary/${dailyPlan.date}`}>
-              <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground text-xs py-1.5">
-                Ver/Editar Día <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </Card>
+                <div className="mb-3">
+                    <h4 className="font-semibold text-base">Actividades del Día</h4>
+                </div>
+                {dayActivities.length > 0 ? (
+                    <ul className="space-y-3">
+                        {dayActivities.map(activity => {
+                            const visuals = activityTypeVisuals[activity.type] || activityTypeVisuals['Actividad'];
+                            const Icon = visuals.icon;
+                            return (
+                                <li key={activity.id} className={cn("text-sm p-3 bg-background rounded-md shadow-sm border-l-4", visuals.border)}>
+                                    <div className="font-semibold flex items-center">
+                                        <Icon className={cn("h-4 w-4 mr-2 shrink-0", visuals.text)} />
+                                        <span>{activity.name} <span className="text-xs font-normal text-muted-foreground">({activity.type}{activity.type === 'Comida' && activity.mealType ? ` - ${activity.mealType}` : ''})</span></span>
+                                    </div>
+                                    <div className="pl-6 space-y-1 mt-1">
+                                        {activity.startTime && <div className="text-xs text-muted-foreground">Horario: {activity.startTime}{activity.endTime && ` - ${activity.endTime}`}</div>}
+                                        {activity.location && <div className="text-xs flex items-center"><Landmark size={14} className="mr-1.5 shrink-0"/> {activity.location}</div>}
+                                        {activity.cityRegion && <div className="text-xs flex items-center"><Building2 size={14} className="mr-1.5 shrink-0"/> {activity.cityRegion}</div>}
+                                        {activity.address && <div className="text-xs flex items-center"><MapPin size={14} className="mr-1.5 shrink-0"/> {activity.address}</div>}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                ) : (
+                    <p className="text-muted-foreground text-sm">No hay actividades planificadas para este día.</p>
+                )}
+                
+                <Link href={`/plan/itinerary/${dailyPlan.date}`} passHref>
+                    <Button variant="link" size="sm" className="mt-4 p-0 h-auto text-primary items-center">
+                        Ver/Editar Día Completo <ArrowRight className="ml-1 h-3 w-3"/>
+                    </Button>
+                </Link>
+            </AccordionContent>
+        </AccordionItem>
     );
 }
 
@@ -150,7 +226,7 @@ const Skeleton = ({ className }: { className?: string }) => (
 
 
 export default function ItineraryPage() {
-  const { activeTripData, isLoading, addActivity, updateActivity, updateDailyPlanImage } = useTripData();
+  const { activeTripData, isLoading, addActivity, updateActivity, updateDailyPlanImage, getActivitiesForDate } = useTripData();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -160,7 +236,7 @@ export default function ItineraryPage() {
 
   const activitiesForMap = useMemo(() => {
     if (!activeTripData || !activeTripData.activities) return [];
-    return activeTripData.activities.filter(act => act.latitude != null && act.longitude != null);
+    return activeTripData.activities; 
   }, [activeTripData]);
 
 
@@ -172,16 +248,15 @@ export default function ItineraryPage() {
             <Skeleton className="h-8 w-3/4 mb-2" />
             <Skeleton className="h-6 w-1/2" />
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <CardContent className="space-y-4">
             {[1, 2, 3].map(i => (
-              <Card key={i} className="overflow-hidden">
-                <Skeleton className="h-48 w-full" />
-                <div className="p-6">
-                  <Skeleton className="h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2 mb-4" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              </Card>
+              <div key={i} className="h-20 w-full flex items-center p-4 bg-muted rounded-lg">
+                  <Skeleton className="h-12 w-12 rounded-md" />
+                  <div className="ml-4 flex-grow space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+              </div>
             ))}
           </CardContent>
         </Card>
@@ -305,17 +380,18 @@ export default function ItineraryPage() {
           )}
 
           {viewMode === 'list' && itineraryDays.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Accordion type="single" collapsible className="w-full space-y-4">
               {itineraryDays.map((dailyPlan, index) => (
-                <DayCard
+                <DayAccordionItem
                   key={dailyPlan.date}
                   dailyPlan={dailyPlan}
                   dayNumber={index + 1}
                   tripId={activeTripData.id}
                   onUpdateDayImage={updateDailyPlanImage}
+                  getActivitiesForDate={getActivitiesForDate}
                 />
               ))}
-            </div>
+            </Accordion>
           )}
 
           {viewMode === 'timeline' && itineraryDays.length > 0 && (
@@ -331,18 +407,20 @@ export default function ItineraryPage() {
             <Map className="mr-2 h-6 w-6" /> Mapa General del Viaje
           </CardTitle>
           <CardDescription>
-            Visualiza todas las actividades del viaje con ubicación. La ruta entre ellas se calculará automáticamente si tienen coordenadas.
-            Asegúrate de que tus actividades tengan latitud y longitud.
+            Visualiza todas las actividades del viaje. Si ingresas coordenadas o direcciones válidas, se mostrará una ruta.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[600px] w-full rounded-md border overflow-hidden bg-muted">
-            <ActivityMapComponent activities={activitiesForMap} />
+            <ActivityMapComponent 
+              activities={activitiesForMap} 
+              tripDestination={activeTripData.destination}
+            />
           </div>
         </CardContent>
          <CardFooter>
             <p className="text-xs text-muted-foreground">
-                Las rutas son generadas por Open Source Routing Machine (OSRM). Las optimizaciones textuales diarias son provistas por IA.
+                El mapa es provisto por Google Maps. Asegúrate de tener una API key válida y correctamente restringida para producción.
             </p>
         </CardFooter>
       </Card>
@@ -350,5 +428,3 @@ export default function ItineraryPage() {
     </div>
   );
 }
-
-    

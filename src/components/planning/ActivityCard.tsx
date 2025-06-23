@@ -3,7 +3,7 @@ import type { ActivityItem, ActivityType } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Utensils, ShoppingCart, Car, Puzzle, MapPin, Clock, DollarSign, FileText, Edit3, Trash2, Landmark, Building2, BedDouble, CalendarRange, LogIn, LogOut } from "lucide-react";
+import { Utensils, ShoppingCart, Car, Puzzle, MapPin, Clock, DollarSign, FileText, Edit3, Trash2, Landmark, Building2, BedDouble, CalendarRange, LogIn, LogOut, Info } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format, parseISO } from "date-fns";
 import { es } from 'date-fns/locale';
+import { cn } from "@/lib/utils";
 
 interface ActivityCardProps {
   activity: ActivityItem;
@@ -25,16 +26,18 @@ interface ActivityCardProps {
   onRemove: () => void;
 }
 
-const activityIcons: Record<ActivityType, React.ElementType> = {
-  'Actividad': Puzzle,
-  'Comida': Utensils,
-  'Compras': ShoppingCart,
-  'Transporte': Car,
-  'Alojamiento': BedDouble,
+const activityTypeVisuals: Record<ActivityType, { bg: string; border: string; text: string; icon: React.ElementType }> = {
+  Actividad: { bg: "bg-purple-100/60 dark:bg-purple-900/30", border: "border-purple-500", text: "text-purple-700 dark:text-purple-300", icon: Puzzle },
+  Comida: { bg: "bg-orange-100/60 dark:bg-orange-900/30", border: "border-orange-500", text: "text-orange-700 dark:text-orange-300", icon: Utensils },
+  Compras: { bg: "bg-pink-100/60 dark:bg-pink-900/30", border: "border-pink-500", text: "text-pink-700 dark:text-pink-300", icon: ShoppingCart },
+  Transporte: { bg: "bg-teal-100/60 dark:bg-teal-900/30", border: "border-teal-500", text: "text-teal-700 dark:text-teal-300", icon: Car },
+  Alojamiento: { bg: "bg-blue-100/60 dark:bg-blue-900/30", border: "border-blue-500", text: "text-blue-700 dark:text-blue-300", icon: BedDouble },
 };
 
+
 export function ActivityCard({ activity, currentDate, onEdit, onRemove }: ActivityCardProps) {
-  const Icon = activityIcons[activity.type] || Puzzle; 
+  const visuals = activityTypeVisuals[activity.type] || activityTypeVisuals['Actividad'];
+  const Icon = visuals.icon;
   const isAccommodation = activity.type === 'Alojamiento';
 
   const activityStartDate = parseISO(activity.startDate);
@@ -61,10 +64,10 @@ export function ActivityCard({ activity, currentDate, onEdit, onRemove }: Activi
 
 
   return (
-    <Card className="overflow-hidden shadow-md transition-all-subtle hover:shadow-lg">
-      <CardHeader className="flex flex-row items-start bg-muted/50 p-4">
+    <Card className={cn("overflow-hidden shadow-md transition-all-subtle hover:shadow-lg border-l-4", visuals.border)}>
+      <CardHeader className={cn("flex flex-row items-start p-4", visuals.bg)}>
         <div className="flex items-center gap-3 flex-grow">
-          <Icon className="h-6 w-6 text-primary" />
+          <Icon className={cn("h-6 w-6", visuals.text)} />
           <div>
             <CardTitle className="text-xl font-headline">{activity.name}</CardTitle>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
@@ -138,13 +141,70 @@ export function ActivityCard({ activity, currentDate, onEdit, onRemove }: Activi
             </div>
           </div>
         )}
+
+        {/* --- START: TYPE-SPECIFIC DETAILS --- */}
+        {activity.type === 'Transporte' && (
+            <>
+                {activity.transportationMode && (
+                    <div className="flex items-start text-sm text-muted-foreground">
+                        <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                        <div><span className="font-medium">Medio: </span>{activity.transportationMode}</div>
+                    </div>
+                )}
+                {activity.gasolineBudget && activity.gasolineBudget > 0 && (
+                    <div className="flex items-start text-sm text-muted-foreground">
+                        <DollarSign className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                        <div><span className="font-medium">Gasolina: </span>${activity.gasolineBudget.toLocaleString()}</div>
+                    </div>
+                )}
+                {activity.tollsBudget && activity.tollsBudget > 0 && (
+                    <div className="flex items-start text-sm text-muted-foreground">
+                        <DollarSign className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                        <div><span className="font-medium">Peajes: </span>${activity.tollsBudget.toLocaleString()}</div>
+                    </div>
+                )}
+            </>
+        )}
+        {activity.type === 'Comida' && activity.mealType && (
+            <div className="flex items-start text-sm text-muted-foreground">
+                <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div><span className="font-medium">Tipo: </span>{activity.mealType}</div>
+            </div>
+        )}
+        {activity.type === 'Comida' && activity.cuisineType && (
+            <div className="flex items-start text-sm text-muted-foreground">
+                <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div><span className="font-medium">Tipo de Cocina: </span>{activity.cuisineType}</div>
+            </div>
+        )}
+        {activity.type === 'Comida' && activity.dietaryNotes && (
+            <div className="flex items-start text-sm text-muted-foreground">
+                <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div><span className="font-medium">Notas Dietéticas: </span>{activity.dietaryNotes}</div>
+            </div>
+        )}
+        {activity.type === 'Actividad' && activity.activityCategory && (
+            <div className="flex items-start text-sm text-muted-foreground">
+                <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div><span className="font-medium">Categoría: </span>{activity.activityCategory}</div>
+            </div>
+        )}
+        {activity.type === 'Compras' && activity.shoppingCategory && (
+            <div className="flex items-start text-sm text-muted-foreground">
+                <Info className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
+                <div><span className="font-medium">Categoría: </span>{activity.shoppingCategory}</div>
+            </div>
+        )}
+        {/* --- END: TYPE-SPECIFIC DETAILS --- */}
+
         {activity.budget !== undefined && activity.budget > 0 && (
           <div className="flex items-center text-sm text-muted-foreground">
             <DollarSign className="mr-2 h-4 w-4" />
-            Presupuesto: ${activity.budget.toLocaleString()}
+            Presupuesto (General): ${activity.budget.toLocaleString()}
           </div>
         )}
-        {activity.reservationInfo && (
+        
+        {activity.type === 'Alojamiento' && activity.reservationInfo && (
           <div className="flex items-start text-sm text-muted-foreground">
             <FileText className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
             <div>
@@ -153,6 +213,7 @@ export function ActivityCard({ activity, currentDate, onEdit, onRemove }: Activi
             </div>
           </div>
         )}
+
         {activity.notes && (
           <div className="flex items-start text-sm text-muted-foreground">
             <FileText className="mr-2 h-4 w-4 shrink-0 mt-0.5" />
@@ -166,4 +227,3 @@ export function ActivityCard({ activity, currentDate, onEdit, onRemove }: Activi
     </Card>
   );
 }
-

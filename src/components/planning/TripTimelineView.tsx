@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState } from "react";
@@ -278,8 +279,6 @@ export function TripTimelineView() {
     const durationInViewDays = actualEndDayIndex - actualStartDayIndex + 1;
     if (durationInViewDays <= 0) return null;
 
-    const gridRowStartVal = actualStartDayIndex + 2; 
-
     let activityGridColumnStartVal = 0;
     let typeGlobalStartIndex = 2; // Column 1 is for dates
     for (const headerSpan of activityTypeHeaderSpans) {
@@ -296,7 +295,7 @@ export function TripTimelineView() {
 
     return {
       activity,
-      gridRow: gridRowStartVal,
+      gridRow: actualStartDayIndex + 2,
       rowSpan: durationInViewDays,
       activityGridColumnStart: activityGridColumnStartVal,
       visuals,
@@ -466,7 +465,12 @@ export function TripTimelineView() {
                     {activity.location && <p className="flex items-center"><Landmark size={14} className="mr-1.5"/>{activity.location}</p>}
                     {activity.cityRegion && <p className="flex items-center"><Building2 size={14} className="mr-1.5"/>{activity.cityRegion}</p>}
                     {activity.address && <p className="flex items-center"><MapPin size={14} className="mr-1.5"/>{activity.address}</p>}
-                    {activity.notes && <p className="flex items-start"><FileText size={14} className="mr-1.5 mt-0.5"/>Notas: <span className="italic whitespace-pre-wrap">{activity.notes}</span></p>}
+                    {activity.notes && (
+                      <div className="flex items-start">
+                        <FileText size={14} className="mr-1.5 mt-0.5 shrink-0"/>
+                        <span>Notas: <span className="italic whitespace-pre-wrap">{activity.notes}</span></span>
+                      </div>
+                    )}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -508,9 +512,40 @@ export function TripTimelineView() {
               {selectedActivityForDialog.location && <p className="flex items-start text-sm"><Landmark size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Punto de Interés: {selectedActivityForDialog.location}</p>}
               {selectedActivityForDialog.cityRegion && <p className="flex items-start text-sm"><Building2 size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Ciudad/Región: {selectedActivityForDialog.cityRegion}</p>}
               {selectedActivityForDialog.address && <p className="flex items-start text-sm"><MapPin size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Dirección: {selectedActivityForDialog.address}</p>}
-              {selectedActivityForDialog.budget !== undefined && selectedActivityForDialog.budget > 0 && <p className="flex items-center text-sm"><DollarSign size={16} className="mr-2 text-primary shrink-0"/>Presupuesto: ${selectedActivityForDialog.budget.toLocaleString()}</p>}
-              {selectedActivityForDialog.reservationInfo && <p className="flex items-start text-sm"><FileText size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Reserva: <span className="whitespace-pre-wrap">{selectedActivityForDialog.reservationInfo}</span></p>}
-              {selectedActivityForDialog.notes && <p className="flex items-start text-sm"><FileText size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Notas: <span className="italic whitespace-pre-wrap">{selectedActivityForDialog.notes}</span></p>}
+              
+              {selectedActivityForDialog.type === 'Transporte' && (
+                <>
+                  {selectedActivityForDialog.transportationMode && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Medio: {selectedActivityForDialog.transportationMode}</p>}
+                  {selectedActivityForDialog.gasolineBudget && selectedActivityForDialog.gasolineBudget > 0 && <p className="flex items-start text-sm"><DollarSign size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Presupuesto Gasolina: ${selectedActivityForDialog.gasolineBudget.toLocaleString()}</p>}
+                  {selectedActivityForDialog.tollsBudget && selectedActivityForDialog.tollsBudget > 0 && <p className="flex items-start text-sm"><DollarSign size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Presupuesto Peajes: ${selectedActivityForDialog.tollsBudget.toLocaleString()}</p>}
+                </>
+              )}
+              {selectedActivityForDialog.type === 'Comida' && selectedActivityForDialog.mealType && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Tipo de Comida: {selectedActivityForDialog.mealType}</p>}
+              {selectedActivityForDialog.type === 'Comida' && selectedActivityForDialog.cuisineType && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Tipo de Cocina: {selectedActivityForDialog.cuisineType}</p>}
+              {selectedActivityForDialog.type === 'Comida' && selectedActivityForDialog.dietaryNotes && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Notas Dietéticas: {selectedActivityForDialog.dietaryNotes}</p>}
+              {selectedActivityForDialog.type === 'Actividad' && selectedActivityForDialog.activityCategory && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Categoría: {selectedActivityForDialog.activityCategory}</p>}
+              {selectedActivityForDialog.type === 'Compras' && selectedActivityForDialog.shoppingCategory && <p className="flex items-start text-sm"><Info size={16} className="mr-2 text-primary shrink-0 mt-0.5"/>Categoría: {selectedActivityForDialog.shoppingCategory}</p>}
+
+              {selectedActivityForDialog.budget !== undefined && selectedActivityForDialog.budget > 0 && <p className="flex items-center text-sm"><DollarSign size={16} className="mr-2 text-primary shrink-0"/>Presupuesto General: ${selectedActivityForDialog.budget.toLocaleString()}</p>}
+              
+              {selectedActivityForDialog.type === 'Alojamiento' && selectedActivityForDialog.reservationInfo && (
+                <div className="text-sm space-y-1">
+                    <div className="font-medium flex items-center">
+                        <FileText size={16} className="mr-2 text-primary shrink-0"/>
+                        Reserva:
+                    </div>
+                    <p className="pl-8 whitespace-pre-wrap text-muted-foreground">{selectedActivityForDialog.reservationInfo}</p>
+                </div>
+              )}
+              {selectedActivityForDialog.notes && (
+                <div className="text-sm space-y-1">
+                    <div className="font-medium flex items-center">
+                        <FileText size={16} className="mr-2 text-primary shrink-0"/>
+                        Notas:
+                    </div>
+                    <p className="pl-8 italic whitespace-pre-wrap text-muted-foreground">{selectedActivityForDialog.notes}</p>
+                </div>
+              )}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
                <AlertDialog>

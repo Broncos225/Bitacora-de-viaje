@@ -35,7 +35,7 @@ const generateTripImageFlow = ai.defineFlow(
     const promptString = `Genera una imagen de banner vibrante y atractiva, de estilo fotorealista y en orientación apaisada (landscape), para un viaje a ${input.destination}. La imagen debe ser escénica, icónica del lugar y adecuada para un resumen de viaje. Evita incluir cualquier texto superpuesto en la imagen.`;
 
     const {media} = await ai.generate({
-      model: 'googleai/gemini-2.0-flash-exp', // Modelo específico para generación de imágenes
+      model: 'googleai/gemini-2.0-flash-preview-image-generation', // Modelo específico para generación de imágenes
       prompt: promptString,
       config: {
         responseModalities: ['TEXT', 'IMAGE'], // Debe incluir IMAGE
