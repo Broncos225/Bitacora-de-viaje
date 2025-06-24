@@ -35,7 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from "@/components/ui/chart";
-import { PieChart, Pie, Cell, RadialBarChart, RadialBar, PolarGrid } from "recharts";
+import { PieChart, Pie, Cell } from "recharts";
 import type jsPDF from 'jspdf';
 import type html2canvas from 'html2canvas';
 
@@ -56,7 +56,11 @@ const PrintableSummary = React.forwardRef<HTMLDivElement, {
       `${totalTravelers} (H:${travelers?.men || 0}, M:${travelers?.women || 0}, N:${travelers?.children || 0}, A:${travelers?.seniors || 0})`
     ) : "No especificado";
     
-    const sortedItinerary = [...(tripData.itinerary || [])].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedItinerary = [...(tripData.itinerary || [])].sort((a, b) => {
+        const dateA = parseISO(a.date).getTime();
+        const dateB = parseISO(b.date).getTime();
+        return dateA - dateB;
+    });
 
     const activityTypePrintableStyles: Record<string, { border: string; bg: string; text: string; }> = {
         Actividad: { border: 'border-[#a855f7]', bg: 'bg-[#a855f7]/10', text: 'text-[#5b21b6]' },
@@ -307,15 +311,15 @@ export default function SummaryPage() {
     
     const priorityOrder: Record<PackingListItem['priority'], number> = { 'Alta': 1, 'Media': 2, 'Baja': 3 };
 
-    const sortedUnpackedItems = unpackedItems.sort((a, b) => {
+    unpackedItems.sort((a, b) => {
         const priorityComparison = priorityOrder[a.priority] - priorityOrder[b.priority];
         if (priorityComparison !== 0) return priorityComparison;
         return a.name.localeCompare(b.name);
     });
     
-    const sortedPackedItems = packedItems.sort((a,b) => a.name.localeCompare(b.name));
+    packedItems.sort((a,b) => a.name.localeCompare(b.name));
     
-    return { packedItems: sortedPackedItems, unpackedItems, totalItems, packedPercentage };
+    return { packedItems, unpackedItems, totalItems, packedPercentage };
   }, [activeTripData?.packingList]);
 
   const preparationsSummary = useMemo(() => {
@@ -335,44 +339,34 @@ export default function SummaryPage() {
     if (!budgetSummary || Object.keys(budgetSummary.budgetByCategory).length === 0) {
       return [];
     }
-
-    const categoryBaseColors: Record<string, string> = {
-      'Actividad': '#a855f7',
-      'Comida': '#f97316',
-      'Compras': '#ec4899',
-      'Transporte': '#14b8a6',
-      'Alojamiento': '#3b82f6',
-      'default': '#6b7280' // gray-500
+    const categoryColors: Record<string, string> = {
+        'Actividad': '#a855f7',
+        'Comida': '#f97316',
+        'Compras': '#ec4899',
+        'Transporte': '#14b8a6',
+        'Transporte (General)': '#14b8a6',
+        'Alojamiento': '#3b82f6',
+        'Gasolina': '#22c55e',
+        'Peajes': '#f59e0b',
+        'default': '#6b7280'
     };
-
-    return Object.entries(budgetSummary.budgetByCategory).map(([category, budget]) => {
-      let color = categoryBaseColors.default;
-
-      if (category.includes('Transporte') || category === 'Gasolina' || category === 'Peajes') {
-        color = categoryBaseColors['Transporte'];
-      } else if (categoryBaseColors[category]) {
-        color = categoryBaseColors[category];
-      }
-      
-      return {
-        category,
-        budget,
-        fill: color
-      };
-    });
+    return Object.entries(budgetSummary.budgetByCategory).map(([category, budget]) => ({
+      category,
+      budget,
+      fill: categoryColors[category] || categoryColors.default,
+    }));
   }, [budgetSummary]);
 
   const budgetChartConfig = useMemo(() => {
+    if (!budgetChartData.length) return {} as ChartConfig;
     const config: ChartConfig = {};
-    if (budgetChartData.length > 0) {
-      budgetChartData.forEach(item => {
-        config[item.category] = {
-          label: item.category,
-          color: item.fill,
-        };
-      });
-    }
-    return config as ChartConfig;
+    budgetChartData.forEach(item => {
+      config[item.category] = {
+        label: item.category,
+        color: item.fill,
+      };
+    });
+    return config;
   }, [budgetChartData]);
 
 
@@ -793,60 +787,98 @@ export default function SummaryPage() {
             </Card>
 
             <div className="space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-xl">
-                            <ClipboardCheck className="mr-2 h-5 w-5 text-primary" />
-                            Preparativos
-                        </CardTitle>
-                        <CardDescription>
-                            {preparationsSummary.completedItems.length} de {preparationsSummary.totalItems} tareas completadas.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex justify-center items-center">
-                      {preparationsSummary.totalItems > 0 ? (
-                        <ChartContainer config={{ progress: { label: "Progreso", color: "hsl(var(--primary))" } }} className="mx-auto aspect-square h-[150px]">
-                            <RadialBarChart data={[{ name: 'progress', value: preparationsSummary.completedPercentage, fill: 'hsl(var(--primary))' }]} startAngle={90} endAngle={-270} innerRadius="70%" outerRadius="100%">
-                                <PolarGrid gridType="circle" radialLines={false} stroke="none" />
-                                <RadialBar dataKey="value" background cornerRadius={10} />
-                                <ChartTooltip content={<ChartTooltipContent cursor={false} contentStyle={{ display: 'none' }} />} />
-                                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-4xl font-bold">
-                                    {preparationsSummary.completedPercentage}%
-                                </text>
-                            </RadialBarChart>
-                        </ChartContainer>
-                      ) : (
-                        <p className="text-muted-foreground text-sm py-4">Sin tareas</p>
-                      )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-xl">
-                            <Briefcase className="mr-2 h-5 w-5 text-primary" />
-                            Empaque
-                        </CardTitle>
-                        <CardDescription>
-                           {packingSummary.packedItems.length} de {packingSummary.totalItems} artículos empacados.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex justify-center items-center">
-                        {packingSummary.totalItems > 0 ? (
-                            <ChartContainer config={{ progress: { label: "Progreso", color: "hsl(var(--accent))" } }} className="mx-auto aspect-square h-[150px]">
-                                <RadialBarChart data={[{ name: 'progress', value: packingSummary.packedPercentage, fill: 'hsl(var(--accent))' }]} startAngle={90} endAngle={-270} innerRadius="70%" outerRadius="100%">
-                                    <PolarGrid gridType="circle" radialLines={false} stroke="none" />
-                                    <RadialBar dataKey="value" background cornerRadius={10} />
-                                    <ChartTooltip content={<ChartTooltipContent cursor={false} contentStyle={{ display: 'none' }} />} />
-                                    <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-4xl font-bold">
-                                        {packingSummary.packedPercentage}%
-                                    </text>
-                                </RadialBarChart>
-                            </ChartContainer>
-                        ) : (
-                          <p className="text-muted-foreground text-sm py-4">Lista vacía</p>
-                        )}
-                    </CardContent>
-                </Card>
+               <Card>
+                   <CardHeader>
+                       <CardTitle className="flex items-center text-xl">
+                           <ClipboardCheck className="mr-2 h-5 w-5 text-primary" />
+                           Preparativos
+                       </CardTitle>
+                       <CardDescription>
+                           {preparationsSummary.completedItems.length} de {preparationsSummary.totalItems} tareas completadas.
+                       </CardDescription>
+                   </CardHeader>
+                   <CardContent className="flex justify-center items-center">
+                     {preparationsSummary.totalItems > 0 ? (
+                       <div className="relative flex items-center justify-center">
+                           <svg height={150} width={150} className="transform -rotate-90">
+                               <circle
+                                   stroke="hsl(var(--muted))"
+                                   fill="transparent"
+                                   strokeWidth={12}
+                                   r={63}
+                                   cx={75}
+                                   cy={75}
+                               />
+                               <circle
+                                   stroke="hsl(var(--primary))"
+                                   fill="transparent"
+                                   strokeWidth={12}
+                                   strokeDasharray={`${2 * Math.PI * 63}`}
+                                   strokeDashoffset={`${2 * Math.PI * 63 * (1 - preparationsSummary.completedPercentage / 100)}`}
+                                   strokeLinecap="round"
+                                   r={63}
+                                   cx={75}
+                                   cy={75}
+                                   className="transition-all duration-1000 ease-in-out"
+                               />
+                           </svg>
+                           <div className="absolute inset-0 flex items-center justify-center">
+                               <span className="text-4xl font-bold">
+                                   {preparationsSummary.completedPercentage}%
+                               </span>
+                           </div>
+                       </div>
+                     ) : (
+                       <p className="text-muted-foreground text-sm py-4">Sin tareas</p>
+                     )}
+                   </CardContent>
+               </Card>
+               <Card>
+                   <CardHeader>
+                       <CardTitle className="flex items-center text-xl">
+                           <Briefcase className="mr-2 h-5 w-5 text-primary" />
+                           Empaque
+                       </CardTitle>
+                       <CardDescription>
+                          {packingSummary.packedItems.length} de {packingSummary.totalItems} artículos empacados.
+                       </CardDescription>
+                   </CardHeader>
+                   <CardContent className="flex justify-center items-center">
+                       {packingSummary.totalItems > 0 ? (
+                           <div className="relative flex items-center justify-center">
+                               <svg height={150} width={150} className="transform -rotate-90">
+                                   <circle
+                                       stroke="hsl(var(--muted))"
+                                       fill="transparent"
+                                       strokeWidth={12}
+                                       r={63}
+                                       cx={75}
+                                       cy={75}
+                                   />
+                                   <circle
+                                       stroke="hsl(var(--accent))"
+                                       fill="transparent"
+                                       strokeWidth={12}
+                                       strokeDasharray={`${2 * Math.PI * 63}`}
+                                       strokeDashoffset={`${2 * Math.PI * 63 * (1 - packingSummary.packedPercentage / 100)}`}
+                                       strokeLinecap="round"
+                                       r={63}
+                                       cx={75}
+                                       cy={75}
+                                       className="transition-all duration-1000 ease-in-out"
+                                   />
+                               </svg>
+                               <div className="absolute inset-0 flex items-center justify-center">
+                                   <span className="text-4xl font-bold">
+                                       {packingSummary.packedPercentage}%
+                                   </span>
+                               </div>
+                           </div>
+                       ) : (
+                         <p className="text-muted-foreground text-sm py-4">Lista vacía</p>
+                       )}
+                   </CardContent>
+               </Card>
             </div>
           </section>
 
@@ -1162,3 +1194,5 @@ function InfoItem({ icon, label, value }: InfoItemProps) {
     </div>
   );
 }
+
+    
